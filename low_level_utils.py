@@ -103,3 +103,105 @@ def backup_file(fname):
     else:
         shutil.copyfile(fname,obase.rsplit('.',1)[0]+now+'.'+obase.rsplit('.',1)[-1])
 
+
+def sanitize_order(order):
+    """
+    takes an array of values (intended to be some sort of order/indexing thing) 
+    and makes it start at zero and be sequential with no duplicates.
+
+
+    gaps are eliminated, and ties are decided based on of appearance in list
+
+    negative numbers are removed
+    """
+
+    import numpy as np
+
+    order = np.array(order)
+    order = order[order>=0]
+
+    order -= order.min()
+
+    #first handle non-uniques by incrementing all values greater than each non-unique one
+    uniq_order, uniq_indices, uniq_counts = np.unique(order, return_index=True, return_counts=True)
+    for idx, num in enumerate(order):
+        if idx not in uniq_indices:
+            order[order>=num] = order[order>=num] + 1
+            #but remember to then decrement the first instance of this number
+            to_dec = np.where(order==num+1)[0][0]
+            order[to_dec] = order[to_dec] - 1
+
+    #ok, now sort, then handle gaps:
+    sorti = np.argsort(order)
+    un_sorti = np.argsort(sorti)    #use this as an indexer to go back to the order passed in
+    sorted_order = order[sorti]
+
+    #now handle gaps:
+    for idx, num in enumerate(sorted_order):
+        if idx == 0:
+            continue
+
+        if sorted_order[idx] != sorted_order[idx-1] + 1:
+            diff = (sorted_order[idx] - sorted_order[idx-1]) - 1
+            assert diff > 0
+            msk = sorted_order >= sorted_order[idx]
+            sorted_order[msk] = sorted_order[msk] - diff
+
+    return sorted_order[un_sorti]
+
+
+def get_midpoints(ar, mode='linear'):
+    """
+    Returns the midpoints of an array; i.e. if you have the left edge of a set
+    of bins and want the middle, this will do that for you.
+
+    :param ar:
+        The array or list of length L to find the midpoints of
+    :param mode:
+        Whether to find the midpoint in logspace ('log') or linear
+        space ('linear')
+
+    :returns:
+        An array of the midpoints of length L - 1
+    """
+    _valid_modes = ['linear', 'log']
+    if mode not in _valid_modes
+        raise TypeError("Unrecognize midpoint method; must be one of {}}.".format(
+            _valid_modes))
+    if mode == 'linear':
+        from numpy import array
+        lst = [ar[i] + (ar[i+1]-ar[i])/2 for i in range(len(ar)) if i != len(ar) -1]
+        return array(lst)
+    elif mode == 'log':
+        from numpy import array,log10
+        lst = [10**(log10(ar[i]) + (log10(ar[i+1])-log10(ar[i]))/2) for i in range(len(ar)) if i != len(ar) -1]
+        return array(lst)
+    else:
+        raise TypeError("How did I get here?  provided mode = {}".format(mode))
+
+
+def format_sci(num,precision=2):
+    '''
+    given a number, returns a string that 
+    represents that number in scientific notation with
+    the specified precision using latex
+    '''
+
+    from numpy import log10,abs
+    from math import floor
+    num = float(num)
+    if num == 0:
+        return r'$0$'
+    power = int(floor(log10(num)))
+    leftover = num/10**power
+    if leftover == 1 or abs(leftover - 1.0) < 1e-10:
+        return r'$10^{'+str(power)+'}$'
+    else:
+        if round(leftover,precision) == int(leftover):
+            toreturn = '$'+str(int(leftover))+r'\times 10^{'+str(power)+'}$'
+        else:
+            toreturn = '$'+str(round(leftover,precision))+r'\times 10^{'+str(power)+'}$'
+        toreturn = toreturn.replace(r'.0\times',r'\times')
+        if toreturn.startswith(r'1\times'):
+            toreturn = toreturn[len(r'1\times'):]
+        return toreturn
