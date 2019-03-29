@@ -8,4 +8,5 @@ utilities packages(or my forked/edited versions of his packages), which are publ
 few functions will rely on the pfh_python package, which is unfortunately not publicly-available at this time.
 
 Just about everything will require numpy, all plotting will require matplotlib, and a few functions are going to
-require one or more of:  yt, astropy, pymodelfit, scipy, and probably some I'm forgetting about right now.
+require one or more of:  yt, astropy, pymodelfit, scipy, tqdm (for progress bars), and probably some I'm forgetting 
+about right now.
