@@ -205,3 +205,27 @@ def format_sci(num,precision=2):
         if toreturn.startswith(r'1\times'):
             toreturn = toreturn[len(r'1\times'):]
         return toreturn
+
+
+def extract_positions_masses(part, species='all', weight='mass'):
+    '''
+    given a particle dictionary, returns an array of the positions
+    and (by default) masses flattened over the species.  convenient
+    for when you want to make a density plot, since this is what you
+    need for that. 
+    '''
+    species = ut.particle.parse_species(part, species)
+    npart = np.sum([part[spec]['mass'].size for spec in species])
+
+    positions = np.empty((npart, 3))
+    masses = np.empty(npart)
+
+    left = 0
+    for spec in species:
+        right = left + part[spec]['mass'].size
+
+        positions[left:right] = part[spec]['position']
+        masses[left:right] = part[spec].prop(weight)
+
+        left = right
+    return positions, masses
