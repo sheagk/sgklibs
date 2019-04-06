@@ -30,21 +30,26 @@ def snapfile_to_readargs(snapfile):
 
 def read_part_wetzel(fname, types, assign_host_coordinates=False, subselect=False, quiet=False, **kwargs):
     """
-    wrapper around gizmo_analysis.gizmo_io.Read.read_snapshots that takes 
-    in a specific filename/snapshot  directory instead of the usual snapshot 
-    index etc.  useful for when the snapshots are unusual names or are in an 
-    unusual output folder.  also makes sure that particle masses are always 
-    in float64, even if everything else is 32 bit.  any kwargs are passed on 
-    to the gizmo_analysis.gizmo_io.Read.read_snapshots function.
+    wrapper around :meth:`gizmo_analysis.gizmo_io.Read.read_snapshots` that takes 
+    in a specific filename/snapshot  directory instead of the usual snapshot_values.
+
+    useful for when the snapshots are unusual names or are in an unusual output 
+    folder.  also makes sure that particle masses are always in float64, even if 
+    everything else is 32 bit.  any kwargs are passed on to the 
+    :meth:`gizmo_analysis.gizmo_io.Read.read_snapshots` function.
 
     finally, has support for subselecting to a sepecific region of space:
         if subselect is not False/None, then it should be a dictionary that contains
-            :type:  either "box" or "sphere" -- specifies whether you cut particles 
+            * type  
+                either "box" or "sphere" -- specifies whether you cut particles 
                 within a sphere or particles within a box
-            :radius: a number in the units of part that gives either half the box length 
+            * radius 
+                a number in the units of part that gives either half the box length 
                 or the radius (depending on type)
-            :center:  a length 3 list-type that gives the center you want to select from.  
+            * center 
+                a length 3 list-type that gives the center you want to select from.  
                 if not given, then assign_host_coordinates must be true.
+    
     """
 
     import gizmo_analysis as gizmo
@@ -126,18 +131,16 @@ def read_part_wetzel(fname, types, assign_host_coordinates=False, subselect=Fals
 
 def readhead_wrapper(snapfile, verbose=False, docosmoconvert=1):
     """
-    uses gadget_lib.readsnap.readsnap to read the header from a gadget files
+    uses :meth:`gadget_lib.readsnap.readsnap` to read a gadget file header
 
-    :param snapfile:  The name of the snapshot/snapdir to read from
+    :param string snapfile:  The name of the snapshot/snapdir to read from
     :param bool verbose:  Print the parsed info or not
-    :param docosmoconvert:  Passed to readsnap as cosmological, which tells it to
-        convert from cosmological (comoving) coordinates to physical ones, and to
-        deal with the h's as well
+    :param bool docosmoconvert:  Passed to readsnap as cosmological, which 
+        tells it to convert from cosmological (comoving) coordinates to 
+        physical ones, and to deal with the h's as well
 
-    :returns:
+    Returns:
         dictionary read by readsnap with header information
-        (see:  https://bitbucket.org/phopkins/gizmo/wiki/Snapshot%20&%20Initial%20Condition%20Files.md#!reading-the-snapshots)
-
     """
 
     from gadget_lib.readsnap import readsnap

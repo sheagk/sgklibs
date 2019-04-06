@@ -1,12 +1,42 @@
 #!/usr/bin/env python
 
+DEFAULT_TABLE_FORMAT = 'ascii.fixed_width'
 
-def my_loadtxt(fname, as_table=False, as_dict=False, table_format='ascii.fixed_width', **kwargs):
-    """"
-    read a collimated text file and return the columns
-    if as_dict, then return a dictionary where the keys
-    are the column headers; otherwise, returns a list of
-    the columns in the order they appear in the file
+def my_loadtxt(fname, 
+        as_table=False, 
+        as_dict=False, 
+        table_format=DEFAULT_TABLE_FORMAT, 
+        **kwargs):
+    """
+    read a collimated text file and return the data as requested.
+
+    leverages :meth:`astropy.table.Table.read` to read the 
+    actual text file, then does some post-processing to return
+    it in a useful format.
+
+    Args:
+        fname:
+            name of the input file to read 
+
+        as_table:
+            whether to return the data directly, with no 
+            post processing
+
+        as_dict:
+            whether to return the data as a dictionary with
+            the keys being the column names
+
+        table_format:
+            format of the table to read
+        
+        kwargs:
+            passed to :meth:`astropy.table.Table.read`
+
+    
+    Returns:
+        the data in `fname`, either as an :class:`astropy.table.Table`,
+        as a dictionary, or (if both are `as_table` and `as_dict` are false)
+        as a list of arrays in the order the columns appear.
     """
 
     import os
@@ -25,53 +55,54 @@ def my_loadtxt(fname, as_table=False, as_dict=False, table_format='ascii.fixed_w
 
 
 def my_savetxt(outname, list_dict_or_arrays, colnames=None, order_dict=None,
-               dtypes=None, table_format='ascii.fixed_width', overwrite=True,
+               dtypes=None, table_format=DEFAULT_TABLE_FORMAT, overwrite=True,
                backup=True, replace_nan=-2, **kwargs):
     """
     flexibly save data to a file in ascii format using astropy
 
-    paramters:
-    ============
-    outname :: string
-        name of output file
+    preserves integer dtypes; otherwise tries float and defaults 
+    to unicode otherwise
 
-    list_dict_or_arrays::  many possibilities, assumes that you want 
-        to save M columns:
+    Args:
+        outname: name of output file
+
+        list_dict_or_arrays:  many possibilities, assumes 
+            that you want to save M columns:
+
             * a numpy structured array with M dtypes where each dtype 
-            is a column
-                -- this gets converted to, then treated like, a dictionary
-                of arrays
+              is a column.  this will get converted to, then treated like, 
+              a dictionary of arrays
             * a list where each M items is a len N array
-                (or list, in which case they'll be cast to arrays)
+              (or list, in which case they'll be cast to arrays)
             * an N x M array
             * a dictionary of where each entry is an len N array
-                (or list, in which case they'll be cast to arrays)
-    colnames:
-        single item (if list_dict_or_arrays is 1xN or Nx1), 
-        list (must be len M) or dictionary giving column names.
-        otherwise, will be constructed as 'col0', 'col1', 'col2', etc.
-        if a dictionary is passed in, colnames will be constructed 
-        from colnames if given, and dictionary keys otherwise.  if 
-        a dictionary is passed in and colnames is NOT a dictionary,
-        then order_dict must be handed in to assing column_names
-    dtypes:
-        either a single item or a list or dictionary giving data
-        types.  useful if data is mixed type.  note that these should
-        be numpy datatypes, as I'll be doing np.array(ar).astype(dtype).
-        can also pass in a single item for everything.  
+              (or list, in which case they'll be cast to arrays)
 
-        if None, then I'll
-            1. check if I'm an int (leave alone if so)
-            2. check if I can become a float
-            3.  leave as a string
-    order_dict:
-        ignored unless list_dict_or_arrays is a dictionary, in which
-        case this gives the order in which the columns should be saved.
-        if this isn't given, they're saved in alphabetical order -- that'll
-        at least get things like vx, vy, vz and x, y, z together
+        colnames:
+            single item (if list_dict_or_arrays is 1xN or Nx1), 
+            list (must be len M) or dictionary giving column names.
+            otherwise, will be constructed as 'col0', 'col1', 'col2', etc.
+            if a dictionary is passed in, colnames will be constructed 
+            from colnames if given, and dictionary keys otherwise.  if 
+            a dictionary is passed in and colnames is NOT a dictionary,
+            then order_dict must be handed in to assing column_names
+        
+        dtypes: either a single item or a list or dictionary giving data
+            types.  useful if data is mixed type.  note that these should
+            be numpy datatypes, as I'll be doing np.array(ar).astype(dtype).
+            can also pass in a single item for everything.  
 
-    preserves integer dtypes; otherwise tries float and defaults to
-     unicode otherwise
+            if None, then I'll
+
+                1. check if I'm an int (leave alone if so)
+                2. check if I can become a float
+                3.  leave as a string
+
+        order_dict:
+            ignored unless list_dict_or_arrays is a dictionary, in which
+            case this gives the order in which the columns should be saved.
+            if this isn't given, they're saved in alphabetical order -- that'll
+            at least get things like vx, vy, vz and x, y, z together
     """
     import numpy as np
 

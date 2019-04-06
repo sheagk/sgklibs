@@ -16,6 +16,86 @@ from .particle_io import read_part_wetzel
 
 
 class Galaxy():
+    """
+    general Galaxy class to do object-oriented work on, well, galaxies
+
+    Pass in either a galaxy/halo dictionary (or a path to one) and an 
+    index in that dictionary to identify a galaxy AND/OR pass in 
+    a ParticleData dictionary (or a path to a snapshot file).  best
+    if both are given, but if only the ParticleData is available, then
+    you can also pass in a "center_position" as a kwarg to define the
+    center and most other stuff will be figured out as best as possible.
+
+    Note that if you pass in *only* part (w/o a center position), then
+    the class will assume that you want the largest object, and it'll do
+    the standard iterative zoom centering algorithm
+
+    you can also pass in a pickled file as fname and load an existing galaxy
+    class (w/o the particle data and halo catalog).  the code will do this 
+    AFTER loading the halo catalog and particle data (if those are also passed 
+    in), so anything created should be saved
+
+    Args:
+        hal: 
+            either a HaloDictionary (loaded via :meth:`rockstar_analysis.rockstar_io.IO.read_catalogs`)
+            or a path to a file to read with that function (arguments related to finding 
+            the file will be figured out, but can pass in extra ones via kwargs)
+
+        index: 
+            index of this galaxy in the halo/galaxy catalog
+
+        part:
+            either a ParticleDictionary (loaded via :meth:`gizmo.gizmo_io.Read.read_snapshots`,
+            or a wrapper around it), or a path to a file to be read with that function
+            (arguments related to id-ing the file are again figured out, and there are
+            defaults for most other arguments included, but pass in any extra via kwargs)
+
+        halt:
+            either: 
+                * a HaloDictionary that holds a merger tree 
+                  (loaded via :meth:`rockstar_analysis.rockstar_io.IO.read_tree`) 
+                * an empty string to load with the defaults
+                * a non-empty string to pass as `rockstar_directory` to 
+                  :meth:`rockstar_analysis.roockstar_io.IO.read_tree`
+
+        fname:
+            an instance of the Galaxy class saved with :meth:`save` 
+
+        host2:
+            if this is True, then you can pass in just hal (w/o an index), and you
+            get the halo that `rockstar_analysis.io` decides is the ''secondary host'' (i.e.
+            second most massive halo that's not overly contaminated)
+
+        kwargs:
+            lots and lots of stuff can be passed in here.  important ones are below:
+
+            two_hosts
+                specify that a catalog should be read as if it's a local group.  only 
+                matters if reading from an ascii, list, or ahf file (i.e., if it's not
+                already in the HaloDictionary that's passed in the HDF5 file that it's 
+                told to load, it won't add it).  HDF5 halo catalogs should already have 
+                host2.distance or another similar host2 quantity, which will be used to 
+                define whether or not there are two hosts.
+
+            distance_max
+                maximum distance to use to define the galaxy (passed to :meth:`get_galaxy_properties`)
+                if no halo catalog is passed in.
+
+            species
+                particle species to read, if you pass in a path to a file as part
+                instead of the particles themselves
+
+            properties:
+                particle properties to read, if reading particles
+
+            center_position:
+                center_position (if not passing in a halo catalog) if you don't want the
+                code to identify the largest object in the box
+
+            center_velocity:
+                center velocity (if not passing in a halo catalog) if you don't want the
+                code to calculate it
+    """
     def __init__(
             self,
             hal=None, index=None,
@@ -25,83 +105,7 @@ class Galaxy():
             hals=None,
             fname=None,
             host2=False, **kwargs):
-        """
-        general galaxy class, work in progress (as is everything)
-        pass in either a galaxy/halo dictionary (or a path to one) and an 
-        index in that dictionary to identify a galaxy AND/OR pass in 
-        a ParticleData dictionary (or a path to a snapshot file).  best
-        if both are given, but if only the ParticleData is available, then
-        you can also pass in a "center_position" as a kwarg to define the
-        center and most other stuff will be figured out as best as possible.
 
-        Note that if you pass in *only* part (w/o a center position), then
-        the class will assume that you want the largest object, and it'll do
-        the standard iterative zoom centering algorithm
-
-        you can also pass in a pickled file as fname and load an existing galaxy
-        class (w/o the particle data and halo catalog).  the code will do this AFTER
-        loading the halo catalog and particle data (if those are also passed in),
-        so anything created should be saved
-
-        :param hal: 
-            either a HaloDictionary (loaded via rockstar.rockstar_io.IO.read_catalogs)
-            or a path to a file to read with that function (arguments related to id-ing 
-            the file will be figured out, but can pass in extra ones via kwargs)
-
-        :param index: 
-            index of this galaxy in the halo/galaxy catalog
-
-        :param part:
-            either a ParticleDictionary (loaded via gizmo.gizmo_io.Read.read_snapshots,
-            or a wrapper around it), or a path to a file to be read with that function
-            (arguements related to id-ing the file are again figured out, and there are
-            defaults for most other arguements included, but pass in any extra via kwargs)
-
-        :param halt:
-            either: 
-                * a HaloDictionary that holds a merger tree (loaded via rockstar.rockstar_io.IO.read_tree) 
-                * an empty string to load with the defaults
-                * a non-empty string to pass as `rockstar_directory` to that function
-
-        :param fname:
-            an instance of the Galaxy class saved with Galaxy.save 
-
-        :param host2:
-            if this is True, then you can pass in just hal (w/o an index), and you
-            get the halo that rockstar.io decides is the ''secondary host'' (i.e.
-            second most massive halo that's not overly contaminated)
-
-        :param kwargs:
-            lots and lots of stuff can be passed in here.  important ones are below:
-
-            :param two_hosts:
-                specify that a catalog should be read as if it's a local group.  only 
-                matters if reading from an ascii, list, or ahf file (i.e., if it's not
-                already in the HaloDictionary that's passed in the HDF5 file that it's 
-                told to load, it won't add it).  HDF5 halo catalogs should already have 
-                host2.distance or another similar host2 quantity, which will be used to 
-                define whether or not there are two hosts.
-
-            :param distance_max:
-                maximum distance to use to define the galaxy (passed to get_galaxy_properties)
-                if no halo catalog is passed in.
-
-            :param species:
-                particle species to read, if you pass in a path to a file as part
-                instead of the particles themselves
-
-            :param properties:
-                particle properties to read, if reading particles
-
-            :param center_position:
-                center_position (if not passing in a halo catalog) if you don't want the
-                code to identify the largest object in the box
-
-            :param center_velocity:
-                center velocity (if not passing in a halo catalog) if you don't want the
-                code to calculate it
-
-        """
         self.center_position = None
         self.center_velocity = None
         self.index = None
