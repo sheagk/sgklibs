@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+
 def my_loadtxt(fname, as_table=False, as_dict=False, table_format='ascii.fixed_width', **kwargs):
     """"
     read a collimated text file and return the columns
@@ -13,18 +14,19 @@ def my_loadtxt(fname, as_table=False, as_dict=False, table_format='ascii.fixed_w
         raise IOError("unable to find {} for reading".format(fname))
 
     from astropy.table import Table
-    import numpy as np   
+    import numpy as np
     t = Table.read(fname, format=table_format, **kwargs)
     if as_table:
         return t
     elif as_dict:
-        return dict([ ( key, np.array(t[key]) ) for key in t.colnames ]) 
+        return dict([(key, np.array(t[key])) for key in t.colnames])
     else:
         return [np.array(t[key]) for key in t.colnames]
 
+
 def my_savetxt(outname, list_dict_or_arrays, colnames=None, order_dict=None,
-    dtypes=None, table_format='ascii.fixed_width', overwrite=True,
-    backup=True, replace_nan=-2 , **kwargs):
+               dtypes=None, table_format='ascii.fixed_width', overwrite=True,
+               backup=True, replace_nan=-2, **kwargs):
     """
     flexibly save data to a file in ascii format using astropy
 
@@ -74,7 +76,8 @@ def my_savetxt(outname, list_dict_or_arrays, colnames=None, order_dict=None,
     import numpy as np
 
     if not len(kwargs.get('delimiter', '|').strip()):
-        raise Warning("!! -- warning -- white-space delimiters can cause problems!  recommend using a character such as |")
+        raise Warning(
+            "!! -- warning -- white-space delimiters can cause problems!  recommend using a character such as |")
 
     assert type(list_dict_or_arrays) in [list, dict, np.ndarray, tuple]
     if type(list_dict_or_arrays) == dict and order_dict is not None:
@@ -83,7 +86,7 @@ def my_savetxt(outname, list_dict_or_arrays, colnames=None, order_dict=None,
         assert type(colnames) in [dict, list, np.ndarray, str]
     if dtypes is not None:
         assert type(dtypes) in [dict, list, str, np.dtype]
-    
+
     def nan_replace(ar):
         if ar.dtype.kind in ['U', 'S']:
             return ar
@@ -91,13 +94,13 @@ def my_savetxt(outname, list_dict_or_arrays, colnames=None, order_dict=None,
             msk = np.isnan(ar)
             ar[msk] = replace_nan
             return ar
-    
+
     def get_as_array(vals, dts, idx, cname):
         if type(dts) == list:
             ar = np.array(vals).astype(dts[idx])
         elif type(dts) in [str, np.dtype]:
-            try:    
-                #allow for some allowances if I pass in just one dtype
+            try:
+                # allow for some allowances if I pass in just one dtype
                 ar = np.array(vals).astype(dts)
             except (ValueError, TypeError):
                 ar = np.array(vals).astype('U')
@@ -108,28 +111,29 @@ def my_savetxt(outname, list_dict_or_arrays, colnames=None, order_dict=None,
             if ar.dtype.kind != 'i':
                 try:
                     ar = ar.astype('f')
-                except ValueError:   #it's a string
+                except ValueError:  # it's a string
                     ar = ar.astype('U')
         ar = nan_replace(ar)
         return ar
 
+    # OK, lots to do here cause I'm trying to handle every possible case
 
-    #OK, lots to do here cause I'm trying to handle every possible case
-
-    #first, if I hand in a structured array, convert it to a dictionary
-    #i'll then handle dictionaries later
+    # first, if I hand in a structured array, convert it to a dictionary
+    # i'll then handle dictionaries later
     if type(list_dict_or_arrays) == np.ndarray:
         if list_dict_or_arrays.dtype.names is not None:
             names = list_dict_or_arrays.dtype.names
-            list_dict_or_arrays = dict([(n, list_dict_or_arrays[n]) for n in names])
+            list_dict_or_arrays = dict(
+                [(n, list_dict_or_arrays[n]) for n in names])
 
-    #ok, now if got passed in a length 1 array, everything is (relatively) easy:
+    # ok, now if got passed in a length 1 array, everything is (relatively) easy:
     input_as_array = np.transpose(np.array(list_dict_or_arrays, copy=True))
     onecol = False
-    if len(input_as_array.shape)==1:    #single array; assume that you want to save as column, cause one line for a long array is dumb
+    # single array; assume that you want to save as column, cause one line for a long array is dumb
+    if len(input_as_array.shape) == 1:
         onecol = True
-    if len(input_as_array.shape)>1:
-        if input_as_array.shape[1]==1:   #single column
+    if len(input_as_array.shape) > 1:
+        if input_as_array.shape[1] == 1:  # single column
             onecol = True
 
     if onecol:
@@ -146,26 +150,28 @@ def my_savetxt(outname, list_dict_or_arrays, colnames=None, order_dict=None,
 
             input_as_array = input_as_array.astype(dtypes)
 
-        if backup:  backup_file(outname)
-        np.savetxt(outname, input_as_array, fmt='%'+dtype_dict.get(input_as_array.dtype.kind, input_as_array.dtype.kind), header=header)
+        if backup:
+            backup_file(outname)
+        np.savetxt(outname, input_as_array, fmt='%'+dtype_dict.get(
+            input_as_array.dtype.kind, input_as_array.dtype.kind), header=header)
         print("Wrote a single column to {}".format(outname))
-
-
 
     else:
         from astropy.table import Table
         t = Table()
 
-        #ok, now handle the cases where I have multple entries to pass in.
-        #first, let's do the most common, a list/sequence of arrays
+        # ok, now handle the cases where I have multple entries to pass in.
+        # first, let's do the most common, a list/sequence of arrays
         if type(list_dict_or_arrays) in [list, tuple]:
             if colnames is None:
-                colnames = ['col'+str(ii) for ii in range(len(list_dict_or_arrays))]
+                colnames = ['col'+str(ii)
+                            for ii in range(len(list_dict_or_arrays))]
             for ii in range(len(list_dict_or_arrays)):
-                ar = get_as_array(list_dict_or_arrays[ii], dtypes, ii, colnames[ii])
+                ar = get_as_array(
+                    list_dict_or_arrays[ii], dtypes, ii, colnames[ii])
                 t[colnames[ii]] = ar
 
-        #now handle a dictionary, in which case I have to worry about the order
+        # now handle a dictionary, in which case I have to worry about the order
         elif type(list_dict_or_arrays) == dict:
             keys = list(list_dict_or_arrays.keys())
             if colnames is None:
@@ -192,16 +198,18 @@ def my_savetxt(outname, list_dict_or_arrays, colnames=None, order_dict=None,
         # now handle a single array, where I want to save a collimated version
         elif type(list_dict_or_arrays) == np.ndarray:
             ncol = list_dict_or_arrays.shape[1]
-            if colnames is None:    colnames = ['col'+str(ii) for ii in range(ncol)]
+            if colnames is None:
+                colnames = ['col'+str(ii) for ii in range(ncol)]
             assert type(colnames) in [list, np.ndarray]
             for ii in range(list_dict_or_arrays.shape[1]):
-                ar = get_as_array(list_dict_or_arrays[:,ii], dtypes, ii, colnames[ii])
+                ar = get_as_array(
+                    list_dict_or_arrays[:, ii], dtypes, ii, colnames[ii])
                 t[colnames[ii]] = ar
         else:
             raise ValueError("Don't know how I got here!")
 
-        if backup:  backup_file(outname)
+        if backup:
+            backup_file(outname)
         t.write(outname, format=table_format, overwrite=overwrite, **kwargs)
-        print("Saved a table with {} rows and {} columns to {}".format(t.columns[0].size, len(t.columns), outname))
-
-
+        print("Saved a table with {} rows and {} columns to {}".format(
+            t.columns[0].size, len(t.columns), outname))

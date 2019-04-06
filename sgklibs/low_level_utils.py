@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
+
 def isint(string):
     try:
         int(string)
         return True
     except ValueError:
         return False
+
 
 def isfloat(string):
     try:
@@ -23,15 +25,15 @@ def normalize_array(ar):
         return shifted_ar/shifted_ar.max()
 
 
-def fast_dist(positions,center=[0,0,0],nexpr=False):
+def fast_dist(positions, center=[0, 0, 0], nexpr=False):
     """
     uses numpy.subtract and numpy.linalg.norm to calculate
     distances quickly.  if nexpr is True and you have more 
     than one object, then it instead uses numexpr, which 
     might save some memory
     """
-    
-    if positions.shape == (3,):         #one object
+
+    if positions.shape == (3,):  # one object
         from numpy import linalg
         return linalg.norm(positions-center)
     elif nexpr:
@@ -39,11 +41,11 @@ def fast_dist(positions,center=[0,0,0],nexpr=False):
         dist2 = evaluate("sum( (positions - center)**2, axis=1)")
         return evaluate("sqrt(dist2)")
     else:
-        from numpy import subtract,linalg
-        return linalg.norm(subtract(positions,center),axis=1)
+        from numpy import subtract, linalg
+        return linalg.norm(subtract(positions, center), axis=1)
 
 
-def boxmsk(pos,cen,size):
+def boxmsk(pos, cen, size):
     """
     returns a binary array that identifies points
     that fall within a box from -size to +size in
@@ -57,11 +59,10 @@ def boxmsk(pos,cen,size):
         half the extent of the box
     """
 
-    from numpy import array,abs
-    px,py,pz = pos[:,0],pos[:,1],pos[:,2]
-    x,y,z = cen
-    return (abs(px-x)<size)&(abs(py-y)<size)&(abs(pz-z)<size)
-
+    from numpy import array, abs
+    px, py, pz = pos[:, 0], pos[:, 1], pos[:, 2]
+    x, y, z = cen
+    return (abs(px-x) < size) & (abs(py-y) < size) & (abs(pz-z) < size)
 
 
 def nearest_index(v1, v2):
@@ -86,7 +87,9 @@ def backup_file(fname):
     if fname exists, then creates a copy of fname
     that's in a subfolder named 'bak' with a timestamp
     """
-    import os,datetime,shutil
+    import os
+    import datetime
+    import shutil
     if not os.path.isfile(fname):
         return
     now = datetime.datetime.now().isoformat().split('.')[0]
@@ -94,14 +97,15 @@ def backup_file(fname):
         bakdir = 'bak/'
         obase = bakdir + fname
     else:
-        bakdir = fname.rsplit('/',1)[0]+'/bak/'
-        obase = bakdir + fname.rsplit('/',1)[-1]
+        bakdir = fname.rsplit('/', 1)[0]+'/bak/'
+        obase = bakdir + fname.rsplit('/', 1)[-1]
     if not os.path.isdir(bakdir):
         os.mkdir(bakdir)
     if '.' not in obase:
-        shutil.copyfile(fname,obase+now)
+        shutil.copyfile(fname, obase+now)
     else:
-        shutil.copyfile(fname,obase.rsplit('.',1)[0]+now+'.'+obase.rsplit('.',1)[-1])
+        shutil.copyfile(fname, obase.rsplit('.', 1)[
+                        0]+now+'.'+obase.rsplit('.', 1)[-1])
 
 
 def sanitize_order(order):
@@ -118,25 +122,27 @@ def sanitize_order(order):
     import numpy as np
 
     order = np.array(order)
-    order = order[order>=0]
+    order = order[order >= 0]
 
     order -= order.min()
 
-    #first handle non-uniques by incrementing all values greater than each non-unique one
-    uniq_order, uniq_indices, uniq_counts = np.unique(order, return_index=True, return_counts=True)
+    # first handle non-uniques by incrementing all values greater than each non-unique one
+    uniq_order, uniq_indices, uniq_counts = np.unique(
+        order, return_index=True, return_counts=True)
     for idx, num in enumerate(order):
         if idx not in uniq_indices:
-            order[order>=num] = order[order>=num] + 1
-            #but remember to then decrement the first instance of this number
-            to_dec = np.where(order==num+1)[0][0]
+            order[order >= num] = order[order >= num] + 1
+            # but remember to then decrement the first instance of this number
+            to_dec = np.where(order == num+1)[0][0]
             order[to_dec] = order[to_dec] - 1
 
-    #ok, now sort, then handle gaps:
+    # ok, now sort, then handle gaps:
     sorti = np.argsort(order)
-    un_sorti = np.argsort(sorti)    #use this as an indexer to go back to the order passed in
+    # use this as an indexer to go back to the order passed in
+    un_sorti = np.argsort(sorti)
     sorted_order = order[sorti]
 
-    #now handle gaps:
+    # now handle gaps:
     for idx, num in enumerate(sorted_order):
         if idx == 0:
             continue
@@ -170,24 +176,26 @@ def get_midpoints(ar, mode='linear'):
             _valid_modes))
     if mode == 'linear':
         from numpy import array
-        lst = [ar[i] + (ar[i+1]-ar[i])/2 for i in range(len(ar)) if i != len(ar) -1]
+        lst = [ar[i] + (ar[i+1]-ar[i])/2 for i in range(len(ar))
+               if i != len(ar) - 1]
         return array(lst)
     elif mode == 'log':
-        from numpy import array,log10
-        lst = [10**(log10(ar[i]) + (log10(ar[i+1])-log10(ar[i]))/2) for i in range(len(ar)) if i != len(ar) -1]
+        from numpy import array, log10
+        lst = [10**(log10(ar[i]) + (log10(ar[i+1])-log10(ar[i]))/2)
+               for i in range(len(ar)) if i != len(ar) - 1]
         return array(lst)
     else:
         raise TypeError("How did I get here?  provided mode = {}".format(mode))
 
 
-def format_sci(num,precision=2):
+def format_sci(num, precision=2):
     '''
     given a number, returns a string that 
     represents that number in scientific notation with
     the specified precision using latex
     '''
 
-    from numpy import log10,abs
+    from numpy import log10, abs
     from math import floor
     num = float(num)
     if num == 0:
@@ -197,11 +205,12 @@ def format_sci(num,precision=2):
     if leftover == 1 or abs(leftover - 1.0) < 1e-10:
         return r'$10^{'+str(power)+'}$'
     else:
-        if round(leftover,precision) == int(leftover):
+        if round(leftover, precision) == int(leftover):
             toreturn = '$'+str(int(leftover))+r'\times 10^{'+str(power)+'}$'
         else:
-            toreturn = '$'+str(round(leftover,precision))+r'\times 10^{'+str(power)+'}$'
-        toreturn = toreturn.replace(r'.0\times',r'\times')
+            toreturn = '$'+str(round(leftover, precision)) + \
+                r'\times 10^{'+str(power)+'}$'
+        toreturn = toreturn.replace(r'.0\times', r'\times')
         if toreturn.startswith(r'1\times'):
             toreturn = toreturn[len(r'1\times'):]
         return toreturn

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import numpy as np
+
+
 def median_in_rolling_bins(x_ar, y_ar, pts_per_bin=15):
     '''
     compute the median of a set of points (given by 
@@ -35,7 +37,7 @@ def median_in_rolling_bins(x_ar, y_ar, pts_per_bin=15):
     return median_x, median_y
 
 
-def average_lines_linear(xvals, yvals, output_xvals, scatter, 
+def average_lines_linear(xvals, yvals, output_xvals, scatter,
                          do_median, percentile_interp='linear'):
     '''
     take the average (in linear space) of a group of lines at output_xvals 
@@ -55,14 +57,15 @@ def average_lines_linear(xvals, yvals, output_xvals, scatter,
     for ii in range(len(xvals)):
         xv = np.array(xvals[ii])
 
-        #make sure they're sorted in increasing x
+        # make sure they're sorted in increasing x
         sorti = np.argsort(xv)
         yv = np.array(yvals[ii])[sorti]
         xv = xv[sorti]
 
         # extend out each line to go from the the smallest xval to the largest xval w/ a flat value
-        xv = np.concatenate(( [min([output_xvals[0], xv.min()-1e-10])], xv, [max([output_xvals[-1], xv.max()+1e-10])] ))
-        yv = np.concatenate(( [yv[0]], yv, [yv[-1]] ))
+        xv = np.concatenate(([min([output_xvals[0], xv.min()-1e-10])],
+                             xv, [max([output_xvals[-1], xv.max()+1e-10])]))
+        yv = np.concatenate(([yv[0]], yv, [yv[-1]]))
 
         lines_at_output_x.append(np.interp(output_xvals, xv, yv))
 
@@ -74,26 +77,27 @@ def average_lines_linear(xvals, yvals, output_xvals, scatter,
     output_high = np.ones(output_xvals.size)*-1
 
     for jj, xv in enumerate(output_xvals):
-        yvs = np.array([lines_at_output_x[ii][jj] for ii in range(len(lines_at_output_x))])
-        if scatter==False or scatter<=0:
-            #not doing scatter, so just take the average with whichver function I'm supposed do
+        yvs = np.array([lines_at_output_x[ii][jj]
+                        for ii in range(len(lines_at_output_x))])
+        if scatter == False or scatter <= 0:
+            # not doing scatter, so just take the average with whichver function I'm supposed do
             l = m = h = average_function(yvs)
         elif do_median:
-            #am doing scatter, and also doing a median
-            l, m, h = np.nanpercentile(yvs, [50 -scatter/2, 50, 50+scatter/2], interpolation=percentile_interp)
+            # am doing scatter, and also doing a median
+            l, m, h = np.nanpercentile(
+                yvs, [50 - scatter/2, 50, 50+scatter/2], interpolation=percentile_interp)
         else:
-            #am doing scatter, not doing median, so doing a mean + scatter
-            l, h = np.nanpercentile(yvs, [50 -scatter/2, 50+scatter/2], interpolation=percentile_interp)
+            # am doing scatter, not doing median, so doing a mean + scatter
+            l, h = np.nanpercentile(
+                yvs, [50 - scatter/2, 50+scatter/2], interpolation=percentile_interp)
             m = np.nanmean(yvs)
         output_low[jj] = l
         output_median[jj] = m
         output_high[jj] = h
-    return {'x':output_xvals, 'median':output_median, 'low':output_low, 'high':output_high}       
+    return {'x': output_xvals, 'median': output_median, 'low': output_low, 'high': output_high}
 
 
-
-
-def average_lines_cubic(xvals, yvals, output_xvals, scatter, extrapolate, do_median, 
+def average_lines_cubic(xvals, yvals, output_xvals, scatter, extrapolate, do_median,
                         percentile_interp='linear'):
     '''
     take the average (in linear space) of a group of lines at output_xvals 
@@ -112,7 +116,7 @@ def average_lines_cubic(xvals, yvals, output_xvals, scatter, extrapolate, do_med
 
     assert type(output_xvals) == np.ndarray
 
-    if extrapolate in ['flat', False]: 
+    if extrapolate in ['flat', False]:
         fill_value = np.nan
     else:
         fill_value = 'extrapolate'
@@ -121,36 +125,43 @@ def average_lines_cubic(xvals, yvals, output_xvals, scatter, extrapolate, do_med
     for ii in range(len(xvals)):
         xv, yv = xvals[ii], yvals[ii]
         if extrapolate == 'flat':
-            #append the min and max ys at the min and max output_xvals
-            xv = np.concatenate(( [min([output_xvals[0], xv.min()-1e-10])], xv, [max([output_xvals[-1], xv.max()+1e-10])] ))
-            yv = np.concatenate(( [yv[0]], yv, [yv[-1]] ))
-        functions.append(interp1d(xv, yv, kind='cubic', bounds_error=False, fill_value=fill_value, assume_sorted=True))
+            # append the min and max ys at the min and max output_xvals
+            xv = np.concatenate(([min([output_xvals[0], xv.min()-1e-10])],
+                                 xv, [max([output_xvals[-1], xv.max()+1e-10])]))
+            yv = np.concatenate(([yv[0]], yv, [yv[-1]]))
+        functions.append(interp1d(xv, yv, kind='cubic', bounds_error=False,
+                                  fill_value=fill_value, assume_sorted=True))
     # functions = [interp1d(xvals[ii], yvals[ii], kind='cubic', bounds_error=False, fill_value=fill_value, assume_sorted=True) for ii in range(len(xvals))]     #don't raise errors; just return nan's
 
     average_function = np.nanmedian if do_median else np.nanmean
 
-    if scatter<=0 or scatter == False:
-        output_yvals = np.array([average_function([f(xv) for f in functions]) for xv in output_xvals])                     #then ignore those nan's when taking the mean
-        return {'x':output_xvals, 'median':output_yvals}
+    if scatter <= 0 or scatter == False:
+        # then ignore those nan's when taking the mean
+        output_yvals = np.array(
+            [average_function([f(xv) for f in functions]) for xv in output_xvals])
+        return {'x': output_xvals, 'median': output_yvals}
 
     output_median = np.empty_like(output_xvals)
     output_low = np.empty_like(output_xvals)
     output_high = np.empty_like(output_xvals)
-    
+
     for ii, xv in enumerate(output_xvals):
         yvs = np.array([f(xv) for f in functions])
         if do_median:
-            l, m, h = np.nanpercentile(yvs, [50 -scatter/2, 50, 50+scatter/2], interpolation=percentile_interp)
+            l, m, h = np.nanpercentile(
+                yvs, [50 - scatter/2, 50, 50+scatter/2], interpolation=percentile_interp)
         else:
-            l, h = np.nanpercentile(yvs, [50 -scatter/2, 50+scatter/2], interpolation=percentile_interp)
+            l, h = np.nanpercentile(
+                yvs, [50 - scatter/2, 50+scatter/2], interpolation=percentile_interp)
             m = np.nanmean(yvs)
         output_low[ii] = l
         output_median[ii] = m
         output_high[ii] = h
-    return {'x':output_xvals, 'median':output_median, 'low':output_low, 'high':output_high}
+    return {'x': output_xvals, 'median': output_median, 'low': output_low, 'high': output_high}
 
-def average_lines(xvals, yvals, output_xvals=None, scatter=0, do_median=True, 
-                linear_interp=False, extrapolate=False, percentile_interp='linear'):
+
+def average_lines(xvals, yvals, output_xvals=None, scatter=0, do_median=True,
+                  linear_interp=False, extrapolate=False, percentile_interp='linear'):
     """
     get the median (in y) along with the scatter (if scatter_percentile > 0) 
     of a bunch of lines defined as xvals[ii] vs yvals[ii].  output_xvals can 
@@ -172,8 +183,8 @@ def average_lines(xvals, yvals, output_xvals=None, scatter=0, do_median=True,
 
     if len1:
         # if I hadned in a len1 array/list, (i.e., a single line), then there's no scatter (low = high = med)
-        return {'x':this_xvals[msk], 'median':this_yvals[msk], 'low':this_yvals[msk], 'high':this_yvals[msk]}
-    
+        return {'x': this_xvals[msk], 'median': this_yvals[msk], 'low': this_yvals[msk], 'high': this_yvals[msk]}
+
     if output_xvals is None or type(output_xvals) == int:
         xmin = min([min(xv) for xv in xvals])
         xmax = max([max(xv) for xv in xvals])
@@ -183,7 +194,8 @@ def average_lines(xvals, yvals, output_xvals=None, scatter=0, do_median=True,
         if xmin == 0:
             output_xvals = np.linspace(xmin, xmax, output_xvals)
         elif xmax / xmin >= 300:
-            output_xvals = np.logspace(np.log10(xmin), np.log10(xmax), output_xvals)
+            output_xvals = np.logspace(
+                np.log10(xmin), np.log10(xmax), output_xvals)
         else:
             output_xvals = np.linspace(xmin, xmax, output_xvals)
     else:
@@ -209,8 +221,9 @@ def average_lines_noscatter(xvals, yvals, output_xvals=None, extrapolate=False):
     from scipy.interpolate import interp1d
 
     assert len(xvals) == len(yvals)
-    for ii in range(len(xvals)):         assert len(xvals[ii]) == len(yvals[ii]) == len(xvals[0])
-    
+    for ii in range(len(xvals)):
+        assert len(xvals[ii]) == len(yvals[ii]) == len(xvals[0])
+
     if output_xvals is None or type(output_xvals) == int:
         xmin = min([min(xv) for xv in xvals])
         xmax = max([max(xv) for xv in xvals])
@@ -220,11 +233,14 @@ def average_lines_noscatter(xvals, yvals, output_xvals=None, extrapolate=False):
         if xmin == 0:
             output_xvals = np.linspace(xmin, xmax, output_xvals)
         elif xmax / xmin >= 300:
-            output_xvals = np.logspace(np.log10(xmin), np.log10(xmax), output_xvals)
+            output_xvals = np.logspace(
+                np.log10(xmin), np.log10(xmax), output_xvals)
         else:
             output_xvals = np.linspace(xmin, xmax, output_xvals)
 
-    functions = [interp1d(xvals[ii], yvals[ii], kind='cubic', bounds_error=False, fill_value='extrapolate' if extrapolate else np.nan) for ii in range(len(xvals))]   #don't raise errors; just return nan's
-    output_yvals = np.array([np.nanmean([f(xv) for f in functions]) for xv in output_xvals])                     #then ignore those nan's when taking the mean
+    functions = [interp1d(xvals[ii], yvals[ii], kind='cubic', bounds_error=False, fill_value='extrapolate' if extrapolate else np.nan)
+                 for ii in range(len(xvals))]  # don't raise errors; just return nan's
+    # then ignore those nan's when taking the mean
+    output_yvals = np.array(
+        [np.nanmean([f(xv) for f in functions]) for xv in output_xvals])
     return output_xvals, output_yvals
-

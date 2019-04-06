@@ -2,13 +2,14 @@ import argparse
 
 from .low_level_utils import isint, isfloat
 
+
 class CustomHelpFormatter(argparse.HelpFormatter):
     """
     Print default values of paramters in a :class:`argparse.ArgumentParser`
 
-    This is a slightly modified version of the 
-    :class:`argparse.HelpFormatter` class from :mod:`argparse` 
-    that adds in the defaults to the help string (for options 
+    This is a slightly modified version of the
+    :class:`argparse.HelpFormatter` class from :mod:`argparse`
+    that adds in the defaults to the help string (for options
     that have defaults).  Initialize a :class:`argparse.ArgumentParser` 
     with the `formatter_class` argument set to `CustomHelpFormatter`
 
@@ -31,6 +32,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
                     help += ' (type: %(type)s)'
         return help
 
+
 class FunctionParser(object):
     """
     Programmatically create a command-line call for a given function
@@ -38,7 +40,7 @@ class FunctionParser(object):
     This class takes in a function and creates an :class:`argparse.ArgumentParser` 
     out of its arguments and docstring to make callable from the command line.  
     That is, if you have a function:
-    
+
     .. code-block:: python
 
         def my_function(required_variable, 
@@ -64,7 +66,7 @@ class FunctionParser(object):
                 something
             '''
             do_something()
-    
+
 
 
     then you can add::
@@ -103,7 +105,7 @@ class FunctionParser(object):
           --optional_variable2 OPTIONAL_VARIABLE2
                                 help string for optional variable 2 (default: 1)
                                 (type: float)
-    
+
 
     Obviously this class is not suitable for all functions, but it does make 
     it easier to write `main` style functions.  It also tries to intelligently 
@@ -141,7 +143,7 @@ class FunctionParser(object):
         elif val in ['False', 'false', False, 'FALSE']:
             return False
 
-        #harder to pass an int check than a float check, so do that first
+        # harder to pass an int check than a float check, so do that first
         elif isint(val):
             return int(val)
         elif isfloat(val):
@@ -206,20 +208,21 @@ class FunctionParser(object):
             if not len(it):
                 continue
             if '=' in it:
-                key,val = it.split('=')
+                key, val = it.split('=')
             elif ':' in it:
-                key,val = it.split(':')
+                key, val = it.split(':')
             elif ' ' in it:
-                key,val = it.split()
+                key, val = it.split()
             else:
                 raise ValueError("no valid separator in {}".format(it))
 
-            #parse as a list in case it is, then check afterwards if it wasn't:
+            # parse as a list in case it is, then check afterwards if it wasn't:
             if limits:
                 val = self.parse_limlist(val)
             else:
                 val = self.parse_list(val)
-                if len(val) == 1:   val = val[0]
+                if len(val) == 1:
+                    val = val[0]
             dictionary[key.strip()] = val
         return dictionary
 
@@ -244,7 +247,7 @@ class FunctionParser(object):
         by that string.  infinity is allowed in all cases.
 
             1. if a ``,`` is not included, returns `float(lims)`
-            
+
             2. if the string begins with either ``,`` or ``[,`` 
                then returns `[-np.inf, float(lims)]`
 
@@ -262,7 +265,7 @@ class FunctionParser(object):
 
         if ',' not in lims:
             lims = [float(lims), np.inf]
-        elif lims[0] == ',' or lims[:2] =='[,':
+        elif lims[0] == ',' or lims[:2] == '[,':
             lims = [-np.inf, float(lims.strip('[,'))]
         else:
             lims = lims.strip('[] ').split(',')
@@ -271,32 +274,36 @@ class FunctionParser(object):
                 lims.append(np.inf)
         return lims
 
-    def _mybool(self,val):
-        #handle boolean conversions w/o telling argparse that's what I'm doing
+    def _mybool(self, val):
+        # handle boolean conversions w/o telling argparse that's what I'm doing
         return self.parse_string(val)
 
     def __init__(self, function=None):
-        import inspect, argparse
+        import inspect
+        import argparse
         from numpy import ndarray
 
         # valid keywords in the docstrings for different datatypes
         types = ['float', 'bool', 'boolean', 'int', 'integer', 'string',
-                'str','list-like','list','array-like','array', 'dict', 
-                'dictionary', 'dict-like', 'limit-dict', 'limdict','limitdict']
+                 'str', 'list-like', 'list', 'array-like', 'array', 'dict',
+                 'dictionary', 'dict-like', 'limit-dict', 'limdict', 'limitdict']
 
         # how we handle each datatype
-        tdict = {'float':float, float:float,
-            'bool':self._mybool, 'boolean':self._mybool, bool:self._mybool,
-            'int':int, 'integer':int, int:int,
-            'string':str, 'str':str, '':str, str:str, None:str, type(None):str,
-            list: self.parse_list, 'list-like': self.parse_list, 'list': self.parse_list, 
-            ndarray: self.parse_array, 'array-like': self.parse_array, 'array': self.parse_array, 
-            dict: self._parse_dict, 'dict': self._parse_dict, 'dictionary': self._parse_dict, 'dict-like': self._parse_dict,
-            'limit-dict': self._parse_limdict, 'limdict': self._parse_limdict, 'limitdict': self._parse_limdict}
+        tdict = {'float': float, float: float,
+                 'bool': self._mybool, 'boolean': self._mybool, bool: self._mybool,
+                 'int': int, 'integer': int, int: int,
+                 'string': str, 'str': str, '': str, str: str, None: str, type(None): str,
+                 list: self.parse_list, 'list-like': self.parse_list, 'list': self.parse_list,
+                 ndarray: self.parse_array, 'array-like': self.parse_array, 'array': self.parse_array,
+                 dict: self._parse_dict, 'dict': self._parse_dict, 'dictionary': self._parse_dict,
+                 'dict-like': self._parse_dict,
+                 'limit-dict': self._parse_limdict, 'limdict': self._parse_limdict,
+                 'limitdict': self._parse_limdict}
 
         if function is None:
             # self.parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-            self.parser = argparse.ArgumentParser(formatter_class=CustomHelpFormatter)
+            self.parser = argparse.ArgumentParser(
+                formatter_class=CustomHelpFormatter)
 
         else:
             self.argspec = inspect.getfullargspec(function)
@@ -307,7 +314,7 @@ class FunctionParser(object):
                 self.defaults = list(self.argspec.defaults)
 
             self.callstring = inspect.formatargspec(*self.argspec).strip('()')
-            
+
             self.fullhelp = inspect.getdoc(function)
             if type(self.fullhelp) is type(None):
                 self.fullhelp = ''
@@ -338,18 +345,20 @@ class FunctionParser(object):
                 if (':param '+arg+':' in self.fullhelp) or (arg+':' in self.fullhelp):
                     if (':param '+arg+':' in self.fullhelp):
                         idx = self.fullhelp.index(':param '+arg+':')
-                        parhelp = self.fullhelp[idx+len(':param '+arg+':'):].split(':param')[0]
+                        parhelp = self.fullhelp[idx +
+                                                len(':param '+arg+':'):].split(':param')[0]
                     else:
                         idx = self.fullhelp.index(arg+':')
-                        parhelp = self.fullhelp[idx+len(arg+':'):].split('\n\n')[0]
-                    
+                        parhelp = self.fullhelp[idx +
+                                                len(arg+':'):].split('\n\n')[0]
+
                     for t in types:
                         if ' '+t in parhelp or ':'+t in parhelp:
                             parhelp = parhelp.replace(t, '', 1)
                             partype = t.strip().strip(':').strip()
                             found = True
                             break
-                    if not found:  #don't know the type listed in the help; default to string
+                    if not found:  # don't know the type listed in the help; default to string
                         partype = str
                 else:
                     parhelp = ''
@@ -363,13 +372,13 @@ class FunctionParser(object):
                 self.typedict[arg] = partype
                 self.helpdict[arg] = parhelp
 
-                #now replace the type with the type of the default, if there is one and it's not explicitely given
-                if self.defaults[ii] != 'nodef' and not found: 
+                # now replace the type with the type of the default, if there is one and it's not explicitely given
+                if self.defaults[ii] != 'nodef' and not found:
                     self.typedict[arg] = type(self.defaults[ii])
 
-            # self.parser = argparse.ArgumentParser(description=self.docstring, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-            self.parser = argparse.ArgumentParser(description=self.docstring, formatter_class=CustomHelpFormatter)
-            
+            self.parser = argparse.ArgumentParser(
+                description=self.docstring, formatter_class=CustomHelpFormatter)
+
             for ii, arg in enumerate(self.args):
                 h = self.helpdict[arg]
                 try:
@@ -377,11 +386,12 @@ class FunctionParser(object):
                 except KeyError:
                     t = str
                 if self.defaults[ii] == 'nodef':
-                    self.parser.add_argument(arg,type=t,help=h)
+                    self.parser.add_argument(arg, type=t, help=h)
                 else:
                     if h == '':
                         h = 'sets '+arg
-                    self.parser.add_argument('--'+arg,type=t,help=h,default=self.defaults[ii])
+                    self.parser.add_argument(
+                        '--'+arg, type=t, help=h, default=self.defaults[ii])
 
     def parse_args(self):
         return vars(self.parser.parse_args())

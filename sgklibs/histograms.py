@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+
 def cumulative_histogram(data, weights=None, bins=None, normed=False, zero=True):
     """
     Makes an cumulative histogram (e.g. N(<=M), M(<t), etc.) when fed data 
@@ -35,17 +36,17 @@ def cumulative_histogram(data, weights=None, bins=None, normed=False, zero=True)
 
     if len(data) == 0:
         print("Passed no data; returning None for the hist and bins")
-        return None,None
-    if type(data) != type(np.array([0,1,2])):
+        return None, None
+    if type(data) != type(np.array([0, 1, 2])):
         data = np.array(data)
     if weights is None:
         weights = np.ones(data.size, dtype=float)
     elif np.isscalar(weights):
-        weights = np.array([weights]*data.size, dtype=float) 
+        weights = np.array([weights]*data.size, dtype=float)
     else:
         assert weights.shape == data.shape
 
-    if bins is not None:    #then this problem is pretty easy
+    if bins is not None:  # then this problem is pretty easy
         if np.isscalar(bins):
             xmin = data.min()
             xmax = data.max()
@@ -58,7 +59,7 @@ def cumulative_histogram(data, weights=None, bins=None, normed=False, zero=True)
             bins = np.sort(np.array(bins))
 
         ## hist = empty(bins.size,dtype=float)
-        ## for ii in range(bins.shape[0]):
+        # for ii in range(bins.shape[0]):
         ##     hist[ii] = weights[data<=bins[ii]].sum()
         # hist = np.array([weights[data<=b].sum() for b in bins])
         counts, bin_edges = np.histogram(data, bins=bins, weights=weights)
@@ -71,10 +72,11 @@ def cumulative_histogram(data, weights=None, bins=None, normed=False, zero=True)
         data = data[sorti]
         weights = weights[sorti]
 
-        ## now, I don't want to do just cumsum because I'm worried about duplicate xvalues
-        ## so let's sum up the weights that fall into any individual bins
-        bins, unique_indices, appearances = np.unique(data, return_index=True, return_counts=True)
-        
+        # now, I don't want to do just cumsum because I'm worried about duplicate xvalues
+        # so let's sum up the weights that fall into any individual bins
+        bins, unique_indices, appearances = np.unique(
+            data, return_index=True, return_counts=True)
+
         output_weights = np.empty(bins.size, dtype=weights.dtype)
         unq = appearances == 1
         not_unq = np.logical_not(unq)
@@ -90,27 +92,28 @@ def cumulative_histogram(data, weights=None, bins=None, normed=False, zero=True)
             l = lefts[ii]
             r = rights[ii]
             idx = not_unq_indices[ii]
-            if r == weights.size:       #then I just go to the end of the array
+            if r == weights.size:  # then I just go to the end of the array
                 output_weights[idx] = np.sum(weights[l:])
             else:
                 output_weights[idx] = np.sum(weights[l:r])
 
         # now I can sum up the weights
-        hist = np.cumsum(output_weights)   
+        hist = np.cumsum(output_weights)
 
     if normed:
-        hist = hist*1.0/hist[-1]        #max it out at 1
+        hist = hist*1.0/hist[-1]  # max it out at 1
 
     if zero:
-        #want the first entry to be 0 so that the lines don't start in the middle of the plot
-        #make it just a little bigger than zero to work with log plots
-        hist = np.concatenate(( [1e-10], hist))
-        bins = np.concatenate(( [bins[0]-1e-10], bins))
+        # want the first entry to be 0 so that the lines don't start in the middle of the plot
+        # make it just a little bigger than zero to work with log plots
+        hist = np.concatenate(([1e-10], hist))
+        bins = np.concatenate(([bins[0]-1e-10], bins))
 
     # returns y, x
     return hist, bins
 
-def anticum_hist(data,bins=None,toadd=0,zero=False,zerox=False):
+
+def anticum_hist(data, bins=None, toadd=0, zero=False, zerox=False):
     """
     Makes an anticumulative histogram (e.g. N(>Vmax)) when fed data (e.g. Vmax
     values).
@@ -142,34 +145,34 @@ def anticum_hist(data,bins=None,toadd=0,zero=False,zerox=False):
         loglog(bins,hist)
     """
 
-    from numpy import histogram,unique,append,cumsum,zeros,array
+    from numpy import histogram, unique, append, cumsum, zeros, array
     data = array(data)
 
     if bins is None:
-        temp,bins = histogram(data,unique(data))
-        hist = append(cumsum(temp[::-1])[::-1],1)
+        temp, bins = histogram(data, unique(data))
+        hist = append(cumsum(temp[::-1])[::-1], 1)
     else:
         if len(data) == 0:
-            return zeros(len(bins)),bins
+            return zeros(len(bins)), bins
         # if max(data) > max(bins):
         #     print "Must have the largest bin be bigger than the largest data point."
         #     print max(bins)
         #     print max(data)
         #     import sys
         #     sys.exit(1337)
-        temp,bins = histogram(data,bins=bins)
-        numbig = data[data>bins.max()].shape[0]
-        temp[-1] += numbig #add on the objects that are above the last bin to the last count, so that they're included in the cumulative sum
-        hist = append(cumsum(temp[::-1])[::-1],numbig)
+        temp, bins = histogram(data, bins=bins)
+        numbig = data[data > bins.max()].shape[0]
+        # add on the objects that are above the last bin to the last count, so that they're included in the cumulative sum
+        temp[-1] += numbig
+        hist = append(cumsum(temp[::-1])[::-1], numbig)
 
-    hist = hist + toadd  #add some number to all the values
+    hist = hist + toadd  # add some number to all the values
 
     if zero:
-        hist = append(hist,1e-10)
-        bins = append(bins,bins[-1])
+        hist = append(hist, 1e-10)
+        bins = append(bins, bins[-1])
     if zerox:
-        hist = append(hist[0],hist)
-        bins = append(1e-10,bins)
+        hist = append(hist[0], hist)
+        bins = append(1e-10, bins)
 
-    return hist,bins
-
+    return hist, bins

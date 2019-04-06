@@ -1,25 +1,26 @@
 #!/usr/bin/env python3
 
 
-def pdfimage_convert(fname,outname):
+def pdfimage_convert(fname, outname):
     """
     use pdfimages (part of brew install poppler) to pull out the raw image
-    
+
     note that this will leave off any overlays, such as scale bars in the PFH images,
     but it will also automatically trim the image.
     """
     import tempfile
     from subprocess import call
-    file,temp = tempfile.mkstemp()
-    tocall = ['pdfimages',fname,temp]
+    file, temp = tempfile.mkstemp()
+    tocall = ['pdfimages', fname, temp]
     e = call(tocall)
     assert e == 0
     fname = temp+'-000.ppm'
-    tocall = ['convert',fname,outname]
+    tocall = ['convert', fname, outname]
     assert call(tocall) == 0
     return outname
 
-def pdf_to_png(fname, outname=None, img_only=True, read_ops={'-density':600}, write_ops={'-quality':100}):
+
+def pdf_to_png(fname, outname=None, img_only=True, read_ops={'-density': 600}, write_ops={'-quality': 100}):
     """
     use ImageMagick convert to convert PDF to PNG.  if img_only,
     then it'll use poppler to pull out the image, so any scale bars
@@ -30,7 +31,7 @@ def pdf_to_png(fname, outname=None, img_only=True, read_ops={'-density':600}, wr
         file, outname = tempfile.mkstemp(suffix='.png')
 
     if img_only:
-        return pdfimage_convert(fname,outname)
+        return pdfimage_convert(fname, outname)
 
     from subprocess import call
     tocall = ['convert']
@@ -45,7 +46,7 @@ def pdf_to_png(fname, outname=None, img_only=True, read_ops={'-density':600}, wr
 
     print(' '.join(tocall))
     e = call(tocall)
-    assert(e==0)
+    assert(e == 0)
     return outname
 
 
@@ -84,7 +85,8 @@ def add_scalebar(fname, outname, img_width, sbar_length, text, lower_left=[0.05,
         x1 = lower_left[0] + (sbar_length/img_width)*w
         y1 = lower_left[1] + sbar_height*h
 
-        draw.rectangle([tuple(lower_left), (x1, y1)], outline=color, fill=color)
+        draw.rectangle([tuple(lower_left), (x1, y1)],
+                       outline=color, fill=color)
         text_x = (x1 + lower_left[0])/2.0
         text_y = (y1 + lower_left[1])/2.0
         # if text_below:
@@ -105,14 +107,15 @@ def add_scalebar(fname, outname, img_width, sbar_length, text, lower_left=[0.05,
         from matplotlib.ticker import NullLocator
         import numpy as np
 
-        fontdict = {'family':font, 'size':fontsize, 'color':color}
+        fontdict = {'family': font, 'size': fontsize, 'color': color}
         img = mpimg.imread(fname)
 
         fig = plt.figure()
         ax = fig.add_axes([0, 0, 1, 1])
         ax.set_axis_off()
-        plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        plt.margins(0,0)
+        plt.subplots_adjust(top=1, bottom=0, right=1,
+                            left=0, hspace=0, wspace=0)
+        plt.margins(0, 0)
         ax.xaxis.set_major_locator(NullLocator())
         ax.yaxis.set_major_locator(NullLocator())
         for spine in ['top', 'left', 'bottom', 'right']:
@@ -142,7 +145,8 @@ def add_scalebar(fname, outname, img_width, sbar_length, text, lower_left=[0.05,
         else:
             va = 'bottom'
             text_y = y0 + offset
-        ax.text(text_x, text_y, text, color=color, fontdict=fontdict, ha='center', va=va)
+        ax.text(text_x, text_y, text, color=color,
+                fontdict=fontdict, ha='center', va=va)
         plt.savefig(outname, dpi=dpi, bbox_inches='tight', pad_inches=0)
 
 
@@ -170,7 +174,7 @@ def crop_image(fname, outname, tot_width, desired_width, tot_height=None, desire
         print("Converting to a png...")
         fname = pdf_to_png(fname)
         img = Image.open(fname)
-    ow,oh = img.size
+    ow, oh = img.size
 
     width_frac = desired_width / tot_width
     if tot_height is None:
@@ -187,7 +191,7 @@ def crop_image(fname, outname, tot_width, desired_width, tot_height=None, desire
     wstart = int(ceil((ow-dw)/2))
     hstart = int(ceil((oh-dh)/2))
 
-    img2 = img.crop((wstart,hstart,wstart+dw,hstart+dh))
+    img2 = img.crop((wstart, hstart, wstart+dw, hstart+dh))
 
     backup_file(outname)
     img2.save(outname)

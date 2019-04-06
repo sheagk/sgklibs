@@ -34,19 +34,22 @@ def permutation_pearson(xvals, yvals, trials=1e5, normalize=True, doparallel=Tru
     if normalize:
         xvals = normalize_array(xvals)
         yvals = normalize_array(yvals)
-        
-    actual_r, actual_p = st.pearsonr(xvals,yvals)
+
+    actual_r, actual_p = st.pearsonr(xvals, yvals)
     npts = yvals.size
     if doparallel:
-        rvalues = Parallel(n_jobs=njobs)(delayed(pearsonr)(xvals,np.random.permutation(yvals)) for ii in range(trials))
-        rvalues = np.array(rvalues)[:,0]
+        rvalues = Parallel(n_jobs=njobs)(delayed(pearsonr)(
+            xvals, np.random.permutation(yvals)) for ii in range(trials))
+        rvalues = np.array(rvalues)[:, 0]
     else:
-        rvalues = np.array([ pearsonr(xvals, np.random.permutation(yvals))[0] for ii in range(trials)])      #compute the r value for n trials of x vs randomly sorting y
-    nbetter = np.count_nonzero(np.abs(rvalues)>np.abs(actual_r))   #count the number of trials that have a larger (in magnitude) r value than the actual sorting
+        rvalues = np.array([pearsonr(xvals, np.random.permutation(yvals))[0] for ii in range(
+            trials)])  # compute the r value for n trials of x vs randomly sorting y
+    # count the number of trials that have a larger (in magnitude) r value than the actual sorting
+    nbetter = np.count_nonzero(np.abs(rvalues) > np.abs(actual_r))
     return nbetter*1.0/trials
 
 
-def permutation_spearman(xvals,yvals,trials=1e5,normalize=True,doparallel=True): 
+def permutation_spearman(xvals, yvals, trials=1e5, normalize=True, doparallel=True):
     """
     given a list of xvals and yvals, returns a p-value that is
     the fraction of the trials that return a larger (in magnitude) 
@@ -74,18 +77,21 @@ def permutation_spearman(xvals,yvals,trials=1e5,normalize=True,doparallel=True):
         xvals = normalize_array(xvals)
         yvals = normalize_array(yvals)
 
-    actual_r, actual_p = st.spearmanr(xvals,yvals)
+    actual_r, actual_p = st.spearmanr(xvals, yvals)
     npts = yvals.size
     if doparallel:
-        rvalues = Parallel(n_jobs=njobs)(delayed(spearmanr)(xvals,np.random.permutation(yvals)) for ii in range(trials))
-        rvalues = np.array(rvalues)[:,0]
+        rvalues = Parallel(n_jobs=njobs)(delayed(spearmanr)(
+            xvals, np.random.permutation(yvals)) for ii in range(trials))
+        rvalues = np.array(rvalues)[:, 0]
     else:
-        rvalues = np.array([ spearmanr(xvals,np.random.permutation(yvals))[0] for ii in range(trials)])  #compute the r value for n trials of x vs randomly sorting y
-    nbetter = np.count_nonzero(np.abs(rvalues)>np.abs(actual_r))   #count the number of trials that have a larger (in magnitude) rank coeffecient than the actual sorting
+        rvalues = np.array([spearmanr(xvals, np.random.permutation(yvals))[0] for ii in range(
+            trials)])  # compute the r value for n trials of x vs randomly sorting y
+    # count the number of trials that have a larger (in magnitude) rank coeffecient than the actual sorting
+    nbetter = np.count_nonzero(np.abs(rvalues) > np.abs(actual_r))
     return nbetter*1.0/trials
 
 
-def bootstrap_pearson(xvals,yvals,trials=1e5,normalize=True,CI=95.):
+def bootstrap_pearson(xvals, yvals, trials=1e5, normalize=True, CI=95.):
     """
     given a list of xvals and yvals, returns a 95% confidence interval
     that is calculated from the distribution of p-values that you get 
@@ -102,17 +108,17 @@ def bootstrap_pearson(xvals,yvals,trials=1e5,normalize=True,CI=95.):
         yvals = normalize_array(yvals)
 
     npts = yvals.size
-    rvalues = np.zeros(trials,dtype='f')
+    rvalues = np.zeros(trials, dtype='f')
 
     for ii in tqdm(range(trials)):
-        idx = np.random.choice(npts,size=npts,replace=True)
-        r,p = st.pearsonr(xvals[idx],yvals[idx])
+        idx = np.random.choice(npts, size=npts, replace=True)
+        r, p = st.pearsonr(xvals[idx], yvals[idx])
         rvalues[ii] = r
 
-    return np.percentile(rvalues, [50-CI/2.,50+CI/2.])
+    return np.percentile(rvalues, [50-CI/2., 50+CI/2.])
 
 
-def bootstrap_spearman(xvals, yvals, trials=1e5, CI=95., returndata=False): 
+def bootstrap_spearman(xvals, yvals, trials=1e5, CI=95., returndata=False):
     """
     given a list of xvals and yvals, returns a 95% confidence interval
     that is calculated from the distribution of p-values that you get 
@@ -123,20 +129,19 @@ def bootstrap_spearman(xvals, yvals, trials=1e5, CI=95., returndata=False):
     xvals = np.array(xvals)
     yvals = np.array(yvals)
     trials = int(trials)
-    
+
     npts = yvals.size
     rvalues = np.zeros(trials, dtype=float)
 
     for ii in tqdm(range(int(trials))):
-        idx = np.random.choice(npts,size=npts,replace=True)
-        r,p = st.spearmanr(xvals[idx],yvals[idx])
+        idx = np.random.choice(npts, size=npts, replace=True)
+        r, p = st.spearmanr(xvals[idx], yvals[idx])
         rvalues[ii] = r
-    
-    ret = np.percentile(rvalues, [50-CI/2.,50+CI/2.])
-    if returndata:
-        return ret[0],ret[1],rvalues
-    return ret
 
+    ret = np.percentile(rvalues, [50-CI/2., 50+CI/2.])
+    if returndata:
+        return ret[0], ret[1], rvalues
+    return ret
 
 
 def bootstrap_ADksamp(samples, CI=95., trials=1e5, warn=False):
@@ -162,19 +167,20 @@ def bootstrap_ADksamp(samples, CI=95., trials=1e5, warn=False):
 
     output_stats = np.empty(trials, dtype=float)
     for ii in tqdm(range(trials)):
-        this_samples = [ v[np.random.choice(n, size=n, replace=True)] for v, n in zip(samples, lengths)]
+        this_samples = [
+            v[np.random.choice(n, size=n, replace=True)] for v, n in zip(samples, lengths)]
         stat, critical, siglevel = st.anderson_ksamp(this_samples)
         output_stats[ii] = stat
-
 
     # now get the output stats that correspond to the requested CI:
     lower, upper = np.percentile(output_stats, [50-CI/2., 50+CI/2.])
 
     # now interpolate/extrapolate the significance level of the lower/upper:
-    ## crit_values are the same for every iteration because it just depends on 
+    # crit_values are the same for every iteration because it just depends on
     #   len(this_samples), which == len(samples), which never changes
-    ## following is copied straight out of scipy's source for anderson_ksamp
-    pf = np.polyfit(critical, np.log(np.array([0.25, 0.1, 0.05, 0.025, 0.01])), 2)
+    # following is copied straight out of scipy's source for anderson_ksamp
+    pf = np.polyfit(critical, np.log(
+        np.array([0.25, 0.1, 0.05, 0.025, 0.01])), 2)
     if warn:
         if lower < critical.min() or lower > critical.max():
             print("!! -- warning:  lower significance lever will be extrapolated")
@@ -184,8 +190,3 @@ def bootstrap_ADksamp(samples, CI=95., trials=1e5, warn=False):
     p_lower = np.exp(np.polyval(pf, lower))
     p_upper = np.exp(np.polyval(pf, upper))
     return [lower, upper], [p_lower, p_upper]
-
-
-
-
-

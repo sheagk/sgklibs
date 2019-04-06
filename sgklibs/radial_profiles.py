@@ -8,8 +8,9 @@ from .low_level_utils import fast_dist
 
 G = Ggrav.to('kpc Msun**-1 km**2 s**-2').value
 
-def all_profiles(bins, positions, velocities, masses, two_dimensional=False, zcut=None, 
-    ages=None, pbar_msg='Making profiles"', nexpr=False):
+
+def all_profiles(bins, positions, velocities, masses, two_dimensional=False, zcut=None,
+                 ages=None, pbar_msg='Making profiles"', nexpr=False):
     """
     assumes all positions and velocities are rotated in the same way, such 
         that the angular momentum axis aligns with the z axis
@@ -18,7 +19,7 @@ def all_profiles(bins, positions, velocities, masses, two_dimensional=False, zcu
         M(<r), M(r), rho = M(r)/dV, Vcirc = sqrt(GM(<r)/r), mag J(r), mag J(<r), J_z(r), J_z(<r)  
     if two_dimensional == True, then compute:
         M(<R), M(R), rho = M(R)/dA, Vcirc = mean(vx**2 + vy**2), mag J(R), mag J(<R), J_z(R), J_z(<R)
-    
+
     :bins : array-like : sorted (from small to large) bin edges to use
     :positions : array-like :  particle positions, rotated such that z aligns with angular momentum axis
     :velocities : array-like : particle velocities, rotated in the same way as the positions
@@ -31,8 +32,7 @@ def all_profiles(bins, positions, velocities, masses, two_dimensional=False, zcu
         from numexpr import evaluate
         print("Using numexpr for the masking and summing masses")
 
-
-    #work from outside in, throwing away particles as I no longer need them
+    # work from outside in, throwing away particles as I no longer need them
     assert positions.shape[0] == velocities.shape[0] == masses.shape[0]
 
     m_of_r = np.empty(bins.size)
@@ -43,23 +43,24 @@ def all_profiles(bins, positions, velocities, masses, two_dimensional=False, zcu
 
     specJinsideR = np.zeros(bins.size)
     specJ_of_r = np.zeros(bins.size)
-    specJz_of_r = np.zeros(bins.size)    
+    specJz_of_r = np.zeros(bins.size)
     specJz_insideR = np.zeros(bins.size)
 
     if ages is not None:
         age_of_r = np.zeros(bins.size)
 
     density = np.empty_like(m_of_r)
-    if two_dimensional:    
+    if two_dimensional:
         vcirc = np.zeros(bins.size)
 
     if two_dimensional:
-        x,y,z = positions.T
-        distances = np.sqrt(x**2 + y**2)            #distances are in the plane of the galaxy
+        x, y, z = positions.T
+        # distances are in the plane of the galaxy
+        distances = np.sqrt(x**2 + y**2)
     else:
-        distances = fast_dist(positions)            #center assumed to be at (0,0,0)
+        distances = fast_dist(positions)  # center assumed to be at (0,0,0)
 
-    #throw away any particles beyond my last bin edge
+    # throw away any particles beyond my last bin edge
     msk = distances <= bins.max()
     if two_dimensional:
         msk = msk & (np.abs(z) <= zcut)
@@ -74,48 +75,56 @@ def all_profiles(bins, positions, velocities, masses, two_dimensional=False, zcu
         x = x[msk]
         y = y[msk]
 
-    #compute (angular) momenta for the particles: 
-    pvec = (velocities.T*masses).T   #velocities should already have the halo at 
-    Jvec = np.cross(positions,pvec)  #J = r cross p, and pos is assumed to have the halo at 0,0,0
+    # compute (angular) momenta for the particles:
+    # velocities should already have the halo at
+    pvec = (velocities.T*masses).T
+    # J = r cross p, and pos is assumed to have the halo at 0,0,0
+    Jvec = np.cross(positions, pvec)
     del pvec
-    Jz = Jvec[:,2]
+    Jz = Jvec[:, 2]
 
-    if two_dimensional:            
-        #calculate circular velocities:
-        vx,vy = velocities[:,0],velocities[:,1]  #velocities in the plane of the disk
-        V = np.vstack((vx,vy)).T                 #velocity vector in the plane of the disk
-        R = np.vstack((x,y)).T                   #distance vector in the plane of the disk
+    if two_dimensional:
+        # calculate circular velocities:
+        # velocities in the plane of the disk
+        vx, vy = velocities[:, 0], velocities[:, 1]
+        V = np.vstack((vx, vy)).T  # velocity vector in the plane of the disk
+        R = np.vstack((x, y)).T  # distance vector in the plane of the disk
 
-        #use the definition of the dot product to find the angle between R and V, theta
-        # a dot b == mag(a) * mag(b) * cos(theta) 
+        # use the definition of the dot product to find the angle between R and V, theta
+        # a dot b == mag(a) * mag(b) * cos(theta)
         # => cos(theta) == a dot b / (mag(a) * mag(b))
-        R_dot_V = np.sum(R*V, axis=1)   #checked by hand -- does the dot product of R[ii] w/ V[ii]
+        # checked by hand -- does the dot product of R[ii] w/ V[ii]
+        R_dot_V = np.sum(R*V, axis=1)
         mag_V = np.linalg.norm(V, axis=1)
-        mag_R = np.linalg.norm(R, axis=1)  #checked by hand -- gives the magnitdue of R[ii]
+        # checked by hand -- gives the magnitdue of R[ii]
+        mag_R = np.linalg.norm(R, axis=1)
         if careful:
-            assert (mag_R == distances).all()   #should be identically true
-        theta = np.arccos( R_dot_V / (mag_R * mag_V) )
+            assert (mag_R == distances).all()  # should be identically true
+        theta = np.arccos(R_dot_V / (mag_R * mag_V))
 
-        #now that I know the angle, the circular velocity of each particle is going to be 
-        #the magnitude of each velocity in the plane of the disk times the sin of angle between R and V 
-        #-- if the angle is 0, then all the velocity is radial; if it's pi/2, then all the velocity is tangential (circular)
+        # now that I know the angle, the circular velocity of each particle is going to be
+        # the magnitude of each velocity in the plane of the disk times the sin of angle between R and V
+        # -- if the angle is 0, then all the velocity is radial; if it's pi/2, then all the velocity is tangential (circular)
         circular_velocities = mag_V*np.sin(theta)
-        
-        #handle any nan (i.e. either R or V == 0) by replacing with a 0
-        print("Replacing {} NaNs with 0".format(np.count_nonzero(np.isnan(circular_velocities))))
+
+        # handle any nan (i.e. either R or V == 0) by replacing with a 0
+        print("Replacing {} NaNs with 0".format(
+            np.count_nonzero(np.isnan(circular_velocities))))
         circular_velocities[np.isnan(circular_velocities)] = 0
 
-        #clean up to save memory
-        del R,V,theta
+        # clean up to save memory
+        del R, V, theta
 
-    assert (np.sort(bins) == bins).all()        #make sure this is true because otherwise return will be nonsense since I use cumsum at the end
+    # make sure this is true because otherwise return will be nonsense since I use cumsum at the end
+    assert (np.sort(bins) == bins).all()
     rev_bins = bins[::-1]
 
     if two_dimensional:
         pbar_msg += '; Mtot(R < {:.0f} kpc, Z < {:.1f} kpc)'.format(bins.max(), zcut)
     else:
         pbar_msg += '; Mtot(r < {:.0f} kpc)'.format(bins.max())
-    pbar_msg += ' = {:.2g} Msun, {:,} particles)'.format(np.sum(masses),masses.size)
+    pbar_msg += ' = {:.2g} Msun, {:,} particles)'.format(
+        np.sum(masses), masses.size)
 
     for ii in tqdm(range(len(rev_bins)), pbar_msg):
         rhigh = rev_bins[ii]
@@ -123,7 +132,7 @@ def all_profiles(bins, positions, velocities, masses, two_dimensional=False, zcu
             rlow = 0
         else:
             rlow = rev_bins[ii+1]
-        assert rlow < rhigh   
+        assert rlow < rhigh
 
         if two_dimensional:
             shell_vol = 4.*np.pi*(rhigh**2 - rlow**2)
@@ -134,38 +143,46 @@ def all_profiles(bins, positions, velocities, masses, two_dimensional=False, zcu
             # within_rhigh = evaluate("(distances <= rhigh)")   #No need to do this -- I trim the particles before the loop and within the loop, so everything is within rhigh trivially
             minsider = evaluate("sum(masses)")
             inbin = evaluate("(distances > rlow)")
-            thism = evaluate("sum(where(inbin,masses,0))")      #sum up the masses where inbin, 0 otherwise
+            # sum up the masses where inbin, 0 otherwise
+            thism = evaluate("sum(where(inbin,masses,0))")
             Jz_of_r[ii] = evaluate("sum(where(inbin,Jz,0))")
             Jz_inside_r[ii] = evaluate("sum(Jz)")
-            #particles that are within rhigh but not in the bin.  equivalent to  (within_rhigh) & (logical_not( (distances>rlow) & (within_rhigh) )
-            #equivalent to False if not within_rhigh, so throws away outer particles
-            #equivalent to True & logical_not(True & True) = True & not(True) = True & False = False if distances > rlow and distances < rhigh
-            #equivalent to True & not(False & True) = True & not(False) = True if distances <= rlow 
-            # keep = evaluate("~inbin")     #but since I trim the particles so within_rhigh is trivially true (see above), this just reduces to not inbin, so no reason to calculate/store that     
+            # particles that are within rhigh but not in the bin.  equivalent to  (within_rhigh) & (logical_not( (distances>rlow) & (within_rhigh) )
+            # equivalent to False if not within_rhigh, so throws away outer particles
+            # equivalent to True & logical_not(True & True) = True & not(True) = True & False = False if distances > rlow and distances < rhigh
+            # equivalent to True & not(False & True) = True & not(False) = True if distances <= rlow
+            # keep = evaluate("~inbin")     #but since I trim the particles so within_rhigh is trivially true (see above), this just reduces to not inbin, so no reason to calculate/store that
         else:
             # within_rhigh = distances <= rhigh
-            inbin = (distances > rlow) #&(within_rhigh)       #works for both 2D and 3D
+            # &(within_rhigh)       #works for both 2D and 3D
+            inbin = (distances > rlow)
             minsider = np.sum(masses)
             thism = np.sum(masses[inbin])
             # keep = within_rhigh & (~inbin)  #save logic as above
-            Jz_of_r[ii] = np.sum(Jz[inbin])                 #just the z angular momentum for the particles int he bin, allowed to cancel
-            Jz_inside_r[ii] = np.sum(Jz)      #Jz of all the particles inside R.  should be smoother.
+            # just the z angular momentum for the particles int he bin, allowed to cancel
+            Jz_of_r[ii] = np.sum(Jz[inbin])
+            # Jz of all the particles inside R.  should be smoother.
+            Jz_inside_r[ii] = np.sum(Jz)
 
         m_of_r[ii] = thism
         density[ii] = thism/shell_vol
 
-        #norm of the vector sum (sum(Jx), sum(Jy), sum(Jz)) of the angular momentum in the bin -- no need to mass weight because J is mass weighted
-        J_of_r[ii] = np.linalg.norm(np.sum(Jvec[inbin],axis=0))
+        # norm of the vector sum (sum(Jx), sum(Jy), sum(Jz)) of the angular momentum in the bin -- no need to mass weight because J is mass weighted
+        J_of_r[ii] = np.linalg.norm(np.sum(Jvec[inbin], axis=0))
 
-        #Do the same for all the particles inside the max of this bin; different because these can cancel differently
-        JinsideR[ii] = np.linalg.norm(np.sum(Jvec,axis=0))       #remember that everything is within the max of this bin
+        # Do the same for all the particles inside the max of this bin; different because these can cancel differently
+        # remember that everything is within the max of this bin
+        JinsideR[ii] = np.linalg.norm(np.sum(Jvec, axis=0))
 
-        #normalize all those to the approrpiate specific value if m > 0.  
+        # normalize all those to the approrpiate specific value if m > 0.
         if thism > 0:
             specJ_of_r[ii] = J_of_r[ii]/thism
             specJz_of_r[ii] = Jz_of_r[ii]/thism
-            if two_dimensional:  vcirc[ii] = np.average(circular_velocities[inbin],weights=masses[inbin])
-            if ages is not None:    age_of_r[ii] = np.average(ages[inbin],weights=masses[inbin])
+            if two_dimensional:
+                vcirc[ii] = np.average(
+                    circular_velocities[inbin], weights=masses[inbin])
+            if ages is not None:
+                age_of_r[ii] = np.average(ages[inbin], weights=masses[inbin])
         if minsider > 0:
             specJinsideR[ii] = JinsideR[ii]/minsider
             specJz_insideR[ii] = Jz_inside_r[ii]/minsider
@@ -176,10 +193,12 @@ def all_profiles(bins, positions, velocities, masses, two_dimensional=False, zcu
         velocities = velocities[~inbin]
         Jvec = Jvec[~inbin]
         Jz = Jz[~inbin]
-        if two_dimensional:    circular_velocities = circular_velocities[~inbin]
-        if ages is not None:    ages = ages[~inbin]
+        if two_dimensional:
+            circular_velocities = circular_velocities[~inbin]
+        if ages is not None:
+            ages = ages[~inbin]
 
-    #swap everything back around so that I go from the inside out so that I can cumsum.  remember bins is already sorted because I didn't swap it; I created rev_bins.
+    # swap everything back around so that I go from the inside out so that I can cumsum.  remember bins is already sorted because I didn't swap it; I created rev_bins.
     density = density[::-1]
     m_of_r = m_of_r[::-1]
 
@@ -201,34 +220,34 @@ def all_profiles(bins, positions, velocities, masses, two_dimensional=False, zcu
     specJltr = np.cumsum(specJ_of_r)
     specJzltr = np.cumsum(specJz_of_r)
 
-    #don't cumsum the "inside R" lines -- doesn't make much sense
+    # don't cumsum the "inside R" lines -- doesn't make much sense
 
-    if two_dimensional==False:
-        #calculate keplerian circular velocity 
-        vcirc = np.sqrt(G*mltr/bins)        #remember that bins didn't get reversed
+    if two_dimensional == False:
+        # calculate keplerian circular velocity
+        vcirc = np.sqrt(G*mltr/bins)  # remember that bins didn't get reversed
     else:
         vcirc = vcirc[::-1]
 
-    #remember this gets saved directly, so be good about naming!
+    # remember this gets saved directly, so be good about naming!
     end = 'R' if two_dimensional else 'r'
     toreturn = {
-            'density'             : density,
-            'M.of.'+end           : m_of_r,
-            'J.of.'+end           : J_of_r,
-            'Jz.of.'+end          : Jz_of_r,
-            'J.inside'+end        : JinsideR,
-            'Jz.inside'+end       : Jz_inside_r,
-            'spec.J.of.'+end      : specJ_of_r,
-            'spec.Jz.of.'+end     : specJz_of_r,
-            'spec.Jinside'+end    : specJinsideR,
-            'spec.Jz.insideR'+end : specJz_insideR,
-            'M.lt.'+end           : mltr,
-            'J.lt.'+end           : Jltr,
-            'Jz.lt.'+end          : Jzltr,
-            'spec.J.lt.'+end      : specJltr,
-            'spec.Jz.lt.'+end     : specJzltr,
-            'vcirc'               : vcirc,
-                }
+        'density': density,
+        'M.of.'+end: m_of_r,
+        'J.of.'+end: J_of_r,
+        'Jz.of.'+end: Jz_of_r,
+        'J.inside'+end: JinsideR,
+        'Jz.inside'+end: Jz_inside_r,
+        'spec.J.of.'+end: specJ_of_r,
+        'spec.Jz.of.'+end: specJz_of_r,
+        'spec.Jinside'+end: specJinsideR,
+        'spec.Jz.insideR'+end: specJz_insideR,
+        'M.lt.'+end: mltr,
+        'J.lt.'+end: Jltr,
+        'Jz.lt.'+end: Jzltr,
+        'spec.J.lt.'+end: specJltr,
+        'spec.Jz.lt.'+end: specJzltr,
+        'vcirc': vcirc,
+    }
     if ages is not None:
         toreturn['age.of.'+end] = age_of_r
 
@@ -248,7 +267,8 @@ def particle_mass_profiles(part, species='all', bins=None, center_position=None,
     import utilities as ut
 
     species = ut.particle.parse_species(part, species)
-    center_position = ut.particle.parse_property(part, 'center_position', center_position)
+    center_position = ut.particle.parse_property(
+        part, 'center_position', center_position)
 
     npart = np.sum([part[spec]['mass'].size for spec in species])
 
@@ -279,11 +299,12 @@ def particle_mass_profiles(part, species='all', bins=None, center_position=None,
 
     return mass_profiles(bins, positions, masses, **kwargs)
 
+
 def mass_profiles(bins, positions, masses, pbar_msg='Making mass profiles', nexpr=False):
     """
     computes: 
         M(<r), M(r), rho = M(r)/dV, Vcirc = sqrt(GM(<r)/r)
-    
+
     :bins : array-like : sorted (from small to large) bin edges to use
     :positions : array-like :  particle positions, with the center at 0,0,0
     :masses : array-like : particle masses, in the same order as positions and velocities
@@ -294,25 +315,26 @@ def mass_profiles(bins, positions, masses, pbar_msg='Making mass profiles', nexp
         from numexpr import evaluate
         print("Using numexpr for the masking and summing masses")
 
-
-    #work from outside in, throwing away particles as I no longer need them
+    # work from outside in, throwing away particles as I no longer need them
     assert positions.shape[0] == masses.shape[0]
 
     m_of_r = np.empty(bins.size)
     density = np.empty_like(m_of_r)
-    distances = fast_dist(positions)            #center assumed to be at (0,0,0)
+    distances = fast_dist(positions)  # center assumed to be at (0,0,0)
 
-    #throw away any particles beyond my last bin edge
+    # throw away any particles beyond my last bin edge
     msk = distances <= bins.max()
     positions = positions[msk]
     masses = masses[msk]
     distances = distances[msk]
 
-    assert (np.sort(bins) == bins).all()        #make sure this is true because otherwise return will be nonsense since I use cumsum at the end
+    # make sure this is true because otherwise return will be nonsense since I use cumsum at the end
+    assert (np.sort(bins) == bins).all()
     rev_bins = bins[::-1]
 
     pbar_msg += '; Mtot(r < {:.0f} kpc)'.format(bins.max())
-    pbar_msg += ' = {:.2g} Msun, {:,} particles)'.format(np.sum(masses),masses.size)
+    pbar_msg += ' = {:.2g} Msun, {:,} particles)'.format(
+        np.sum(masses), masses.size)
 
     for ii in tqdm(range(len(rev_bins)), pbar_msg):
         rhigh = rev_bins[ii]
@@ -320,22 +342,24 @@ def mass_profiles(bins, positions, masses, pbar_msg='Making mass profiles', nexp
             rlow = 0
         else:
             rlow = rev_bins[ii+1]
-        assert rlow <= rhigh   
+        assert rlow <= rhigh
 
         shell_vol = 4./3.*np.pi*(rhigh**3 - rlow**3)
         if nexpr:
             # within_rhigh = evaluate("(distances <= rhigh)")   #No need to do this -- I trim the particles before the loop and within the loop, so everything is within rhigh trivially
             minsider = evaluate("sum(masses)")
             inbin = evaluate("(distances > rlow)")
-            thism = evaluate("sum(where(inbin,masses,0))")      #sum up the masses where inbin, 0 otherwise
-            #particles that are within rhigh but not in the bin.  equivalent to  (within_rhigh) & (logical_not( (distances>rlow) & (within_rhigh) )
-            #equivalent to False if not within_rhigh, so throws away outer particles
-            #equivalent to True & logical_not(True & True) = True & not(True) = True & False = False if distances > rlow and distances < rhigh
-            #equivalent to True & not(False & True) = True & not(False) = True if distances <= rlow 
-            # keep = evaluate("~inbin")     #but since I trim the particles so within_rhigh is trivially true (see above), this just reduces to not inbin, so no reason to calculate/store that     
+            # sum up the masses where inbin, 0 otherwise
+            thism = evaluate("sum(where(inbin,masses,0))")
+            # particles that are within rhigh but not in the bin.  equivalent to  (within_rhigh) & (logical_not( (distances>rlow) & (within_rhigh) )
+            # equivalent to False if not within_rhigh, so throws away outer particles
+            # equivalent to True & logical_not(True & True) = True & not(True) = True & False = False if distances > rlow and distances < rhigh
+            # equivalent to True & not(False & True) = True & not(False) = True if distances <= rlow
+            # keep = evaluate("~inbin")     #but since I trim the particles so within_rhigh is trivially true (see above), this just reduces to not inbin, so no reason to calculate/store that
         else:
             # within_rhigh = distances <= rhigh
-            inbin = (distances > rlow) #&(within_rhigh)       #works for both 2D and 3D
+            # &(within_rhigh)       #works for both 2D and 3D
+            inbin = (distances > rlow)
             minsider = np.sum(masses)
             thism = np.sum(masses[inbin])
             # keep = within_rhigh & (~inbin)  #save logic as above
@@ -347,38 +371,37 @@ def mass_profiles(bins, positions, masses, pbar_msg='Making mass profiles', nexp
         masses = masses[~inbin]
         positions = positions[~inbin]
 
-        if pbar is not None:             pbar.update(ii)
-    if pbar is not None:    pbar.finish()
+        if pbar is not None:
+            pbar.update(ii)
+    if pbar is not None:
+        pbar.finish()
 
-    #swap everything back around so that I go from the inside out so that I can cumsum.  remember bins is already sorted because I didn't swap it; I created rev_bins.
+    # swap everything back around so that I go from the inside out so that I can cumsum.  remember bins is already sorted because I didn't swap it; I created rev_bins.
     density = density[::-1]
     m_of_r = m_of_r[::-1]
     mltr = np.cumsum(m_of_r)
 
-    #calculate keplerian circular velocity 
-    vcirc = np.sqrt(G*mltr/bins)        #remember that bins didn't get reversed
+    # calculate keplerian circular velocity
+    vcirc = np.sqrt(G*mltr/bins)  # remember that bins didn't get reversed
 
-    #remember this gets saved directly, so be good about naming!
+    # remember this gets saved directly, so be good about naming!
     end = 'r'
     toreturn = {
-            'density'             : density,
-            'M.of.'+end           : m_of_r,
-            'M.lt.'+end           : mltr,
-            'vcirc'               : vcirc,
-            'bins'                : bins,
-                }
+        'density': density,
+        'M.of.'+end: m_of_r,
+        'M.lt.'+end: mltr,
+        'vcirc': vcirc,
+        'bins': bins,
+    }
 
     return toreturn
-
-
-
 
 
 def mass_profiles_nopair(bins, positions, masses, pair_distance, pbar_msg='Making mass profiles', nexpr=False):
     """
     computes: 
         M(<r), M(r), rho = M(r)/dV, Vcirc = sqrt(GM(<r)/r)
-    
+
     assumes that particles closer to second host (whcih is pair_distance from main 
         host) are removed already.  removes the volume in that region from density 
         calculations.
@@ -395,25 +418,26 @@ def mass_profiles_nopair(bins, positions, masses, pair_distance, pbar_msg='Makin
 
     pair_midpoint_distance = pair_distance / 2.0
 
-
-    #work from outside in, throwing away particles as I no longer need them
+    # work from outside in, throwing away particles as I no longer need them
     assert positions.shape[0] == masses.shape[0]
 
     m_of_r = np.empty(bins.size)
     density = np.empty_like(m_of_r)
-    distances = fast_dist(positions)            #center assumed to be at (0,0,0)
+    distances = fast_dist(positions)  # center assumed to be at (0,0,0)
 
-    #throw away any particles beyond my last bin edge
+    # throw away any particles beyond my last bin edge
     msk = distances <= bins.max()
     positions = positions[msk]
     masses = masses[msk]
     distances = distances[msk]
 
-    assert (np.sort(bins) == bins).all()        #make sure this is true because otherwise return will be nonsense since I use cumsum at the end
+    # make sure this is true because otherwise return will be nonsense since I use cumsum at the end
+    assert (np.sort(bins) == bins).all()
     rev_bins = bins[::-1]
 
     pbar_msg += '; Mtot(r < {:.0f} kpc)'.format(bins.max())
-    pbar_msg += ' = {:.2g} Msun, {:,} particles)'.format(np.sum(masses),masses.size)
+    pbar_msg += ' = {:.2g} Msun, {:,} particles)'.format(
+        np.sum(masses), masses.size)
 
     for ii in tqdm(range(len(rev_bins)), pbar_msg):
         rhigh = rev_bins[ii]
@@ -421,19 +445,19 @@ def mass_profiles_nopair(bins, positions, masses, pair_distance, pbar_msg='Makin
             rlow = 0
         else:
             rlow = rev_bins[ii+1]
-        assert rlow < rhigh   
+        assert rlow < rhigh
 
         if rhigh <= pair_midpoint_distance:
             shell_vol = 4./3.*np.pi*(rhigh**3 - rlow**3)
         else:
-            #ok, more complicated because I need to subtract out the volume where the particles are trimmed
+            # ok, more complicated because I need to subtract out the volume where the particles are trimmed
             # from wikipedia's article on spherical caps:
-            #f the radius of the sphere is r and the height of the cap is h, then the volume of the spherical cap is:
-            ### V= pi/3 * h^2 * (3r - h)
-            cap_vol = lambda r, h: (np.pi/3.) * (h**2) * (3*r - h)
+            # f the radius of the sphere is r and the height of the cap is h, then the volume of the spherical cap is:
+            # V= pi/3 * h^2 * (3r - h)
+            def cap_vol(r, h): return (np.pi/3.) * (h**2) * (3*r - h)
 
             if rlow <= pair_midpoint_distance:
-                #then rhigh is over the border, but rlow is under it
+                # then rhigh is over the border, but rlow is under it
                 vol_low = 4./3. * np.pi * rlow**3
             else:
                 height_of_low_cap = rlow - pair_midpoint_distance
@@ -451,15 +475,17 @@ def mass_profiles_nopair(bins, positions, masses, pair_distance, pbar_msg='Makin
             # within_rhigh = evaluate("(distances <= rhigh)")   #No need to do this -- I trim the particles before the loop and within the loop, so everything is within rhigh trivially
             minsider = evaluate("sum(masses)")
             inbin = evaluate("(distances > rlow)")
-            thism = evaluate("sum(where(inbin,masses,0))")      #sum up the masses where inbin, 0 otherwise
-            #particles that are within rhigh but not in the bin.  equivalent to  (within_rhigh) & (logical_not( (distances>rlow) & (within_rhigh) )
-            #equivalent to False if not within_rhigh, so throws away outer particles
-            #equivalent to True & logical_not(True & True) = True & not(True) = True & False = False if distances > rlow and distances < rhigh
-            #equivalent to True & not(False & True) = True & not(False) = True if distances <= rlow 
-            # keep = evaluate("~inbin")     #but since I trim the particles so within_rhigh is trivially true (see above), this just reduces to not inbin, so no reason to calculate/store that     
+            # sum up the masses where inbin, 0 otherwise
+            thism = evaluate("sum(where(inbin,masses,0))")
+            # particles that are within rhigh but not in the bin.  equivalent to  (within_rhigh) & (logical_not( (distances>rlow) & (within_rhigh) )
+            # equivalent to False if not within_rhigh, so throws away outer particles
+            # equivalent to True & logical_not(True & True) = True & not(True) = True & False = False if distances > rlow and distances < rhigh
+            # equivalent to True & not(False & True) = True & not(False) = True if distances <= rlow
+            # keep = evaluate("~inbin")     #but since I trim the particles so within_rhigh is trivially true (see above), this just reduces to not inbin, so no reason to calculate/store that
         else:
             # within_rhigh = distances <= rhigh
-            inbin = (distances > rlow) #&(within_rhigh)       #works for both 2D and 3D
+            # &(within_rhigh)       #works for both 2D and 3D
+            inbin = (distances > rlow)
             minsider = np.sum(masses)
             thism = np.sum(masses[inbin])
             # keep = within_rhigh & (~inbin)  #save logic as above
@@ -471,33 +497,22 @@ def mass_profiles_nopair(bins, positions, masses, pair_distance, pbar_msg='Makin
         masses = masses[~inbin]
         positions = positions[~inbin]
 
-    #swap everything back around so that I go from the inside out so that I can cumsum.  remember bins is already sorted because I didn't swap it; I created rev_bins.
+    # swap everything back around so that I go from the inside out so that I can cumsum.  remember bins is already sorted because I didn't swap it; I created rev_bins.
     density = density[::-1]
     m_of_r = m_of_r[::-1]
     mltr = np.cumsum(m_of_r)
 
-    #calculate keplerian circular velocity 
-    vcirc = np.sqrt(G*mltr/bins)        #remember that bins didn't get reversed
+    # calculate keplerian circular velocity
+    vcirc = np.sqrt(G*mltr/bins)  # remember that bins didn't get reversed
 
-    #remember this gets saved directly, so be good about naming!
+    # remember this gets saved directly, so be good about naming!
     end = 'r'
     toreturn = {
-            'density'             : density,
-            'M.of.'+end           : m_of_r,
-            'M.lt.'+end           : mltr,
-            'vcirc'               : vcirc,
-            'bins'                : bins,
-                }
+        'density': density,
+        'M.of.'+end: m_of_r,
+        'M.lt.'+end: mltr,
+        'vcirc': vcirc,
+        'bins': bins,
+    }
 
     return toreturn
-
-
-
-
-
-
-
-
-
-
-
