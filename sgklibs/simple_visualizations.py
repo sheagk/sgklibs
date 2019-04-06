@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import numpy as np
+
 def convert_to_per_pc2(counts, bsize_in_kpc):
     '''
     converts a 2d histogram of mass per bin-size^2
@@ -74,7 +76,6 @@ def viz_part_indices(hal_i,part,hal,species_name='star',kind='3panel',
 
     assert kind in ['3panel','edgeon','faceon']
 
-    import numpy as np    
     import matplotlib
     import matplotlib as mpl
     import matplotlib.pyplot as plt
@@ -506,7 +507,6 @@ def viz_part_2d(part, center_position, outbase=None, outext='png',
 
     assert kind in ['3panel','edgeon','faceon']
 
-    import numpy as np    
     import matplotlib
     import matplotlib as mpl
     import matplotlib.pyplot as plt
@@ -514,7 +514,7 @@ def viz_part_2d(part, center_position, outbase=None, outext='png',
     from matplotlib.gridspec import GridSpec
 
     import utilities as ut
-    from .low_level_utils import boxmsk, 
+    from .low_level_utils import boxmsk
 
     try:
         if nearby_method.startswith('hist'):        nearby_method = 'hist'
@@ -917,7 +917,6 @@ def viz_with_halos(part,hal=None,species_name='star',kind='3panel',
     '''
     assert kind in ['3panel','edgeon','faceon']
 
-    import numpy as np    
     import matplotlib
     import matplotlib as mpl
     import matplotlib.pyplot as plt
@@ -925,7 +924,6 @@ def viz_with_halos(part,hal=None,species_name='star',kind='3panel',
     from matplotlib.gridspec import GridSpec
 
     import utilities as ut
-    import numpy as np
 
     from .low_level_utils import boxmsk
 
@@ -943,7 +941,6 @@ def viz_with_halos(part,hal=None,species_name='star',kind='3panel',
         xp,yp,zp = (part[species_name]['position'][msk] - center_position).T   
     weights = part[species_name]['mass'][msk]
 
-    import numpy as np
     import matplotlib.pyplot as plt
     from matplotlib.colors import LogNorm
     from math import ceil,floor

@@ -165,7 +165,7 @@ def get_midpoints(ar, mode='linear'):
         An array of the midpoints of length L - 1
     """
     _valid_modes = ['linear', 'log']
-    if mode not in _valid_modes
+    if mode not in _valid_modes:
         raise TypeError("Unrecognize midpoint method; must be one of {}}.".format(
             _valid_modes))
     if mode == 'linear':
