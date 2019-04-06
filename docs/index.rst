@@ -1,48 +1,23 @@
-Welcome to the documentations for sgklibs
+Welcome to the docs for sgklibs
 =========================================
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+
+   Galaxy-focused analysis <galaxy>
+   Parsers <argparse> 
+   I/O tools <io>
+   Astronomical relationships <astro_relations>
+   Average/median sets of lines <averaging>
+   Boostrap/permute data <boostrap>
+   (Anti-)cumulative histograms <histograms>
+   Radial profiles <profiles>
+   Visualization tools <visualizations>
 
 
-.. automodule:: sgklibs.argument_parsers
-    :members:
+.. Indices and tables
+.. ==================
+:ref:`search`
 
-.. automodule:: sgklibs.ascii_io
-    :members:
-
-.. automodule:: sgklibs.particle_io
-    :members:
-
-.. automodule:: sgklibs.astro_relationships
-    :members:
-
-.. automodule:: sgklibs.averaging
-    :members:
-
-.. automodule:: sgklibs.bootstrap_and_permute
-    :members:
-
-.. automodule:: sgklibs.galaxy_analysis
-    :members:
-
-.. automodule:: sgklibs.histograms
-    :members:
-
-.. automodule:: sgklibs.radial_profiles
-    :members:
-
-.. automodule:: sgklibs.simple_visualizations
-    :members:
-
-.. automodule:: sgklibs.yt_visualizations
-    :members:
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+.. * :ref:`genindex`
+.. * :ref:`modindex`

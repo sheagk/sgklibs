@@ -3,11 +3,18 @@ import argparse
 from .low_level_utils import isint, isfloat
 
 class CustomHelpFormatter(argparse.HelpFormatter):
-    '''
-    A slightly modified version of the HelpFormatter
-    class from argparse that includes that defaults
-    for options that have defaults.
-    '''
+    """
+    Print default values of paramters in a :class:`argparse.ArgumentParser`
+
+    This is a slightly modified version of the 
+    :class:`argparse.HelpFormatter` class from :mod:`argparse` 
+    that adds in the defaults to the help string (for options 
+    that have defaults).  Initialize a :class:`argparse.ArgumentParser` 
+    with the `formatter_class` argument set to `CustomHelpFormatter`
+
+    See :class:`argparse.HelpFormatter` for a description of
+    the arguments
+    """
 
     def _get_help_string(self, action):
         help = action.help
