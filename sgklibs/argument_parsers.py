@@ -14,6 +14,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
 
     See :class:`argparse.HelpFormatter` for a description of
     the arguments
+
     """
 
     def _get_help_string(self, action):
@@ -30,55 +31,110 @@ class CustomHelpFormatter(argparse.HelpFormatter):
                     help += ' (type: %(type)s)'
         return help
 
-class FunctionParser:
-    '''
-    A class that takes in a function and makes it 
-    callable via the command line.  That is, if you
-    have a function:
+class FunctionParser(object):
+    """
+    Programmatically create a command-line call for a given function
 
-    def my_function(required_variable, optional_variable1=a):
-        ...
+    This class takes in a function and creates an :class:`argparse.ArgumentParser` 
+    out of its arguments and docstring to make callable from the command line.  
+    That is, if you have a function:
+    
+    .. code-block:: python
 
-    then you can add:
+        def my_function(required_variable, 
+                optional_variable1='a string', 
+                optional_variable2=1,
+            ):
+            '''
+            function descriptions.
 
-    if __name__ == "__main__":
-        kwargs = FunctionParser(my_function).parse_args()
-        my_function(**kwargs)
+            more detailed description here.
 
-    then call the function via the command line with 
+            Args:
+                required_variable:
+                    help string for required variable
 
-    $ python file_name.py required_variable_value --optional_variable1=b
+                optional_variable1: string
+                    help string for optional variable 1
 
-    obviously not suitable for all functions, but makes it easier to write
-    main style functions.  also tries to intelligently parse different data
-    types, includes things like lists, arrays, and dictionaries.
+                optional_variable2: float
+                    help string for optional variable 2
 
-    this class will even go through the docstring of my_function (if included) 
+            Returns:
+                something
+            '''
+            do_something()
+    
+
+
+    then you can add::
+
+        if __name__ == "__main__":
+            kwargs = FunctionParser(my_function).parse_args()
+            my_function(**kwargs)
+
+
+    then call the function via the command line with::
+
+        $ python file_name.py required_variable_value --optional_variable1='another string'
+
+
+    Note that you can also do::
+
+        $ python file_name.py --help
+
+
+    to see::
+
+        usage: file_name.py [-h] [--optional_variable1 OPTIONAL_VARIABLE1]
+                            [--optional_variable2 OPTIONAL_VARIABLE2]
+                            required_variable
+
+        function descriptions. more detailed description here.
+
+        positional arguments:
+          required_variable     help for required variable
+
+        optional arguments:
+          -h, --help            show this help message and exit
+          --optional_variable1 OPTIONAL_VARIABLE1
+                                help string for optional variable 1 (default: a
+                                string) (type: str)
+          --optional_variable2 OPTIONAL_VARIABLE2
+                                help string for optional variable 2 (default: 1)
+                                (type: float)
+    
+
+    Obviously this class is not suitable for all functions, but it does make 
+    it easier to write `main` style functions.  It also tries to intelligently 
+    parse different data types, includes things like lists, arrays, and dictionaries.
+
+    This class will even go through the docstring of my_function (if included) 
     and pull out the description of each parameter (and the type of that parameter)
     to use for the help text of the parser and to parse into the proper datatype.
     if there are no docstrings, then default value types are used for the optinoal 
     arguments and required arguments will be passed following the rules in 
-    parse_string
-    '''
+    `parse_string`
+    """
 
     def parse_string(self, val):
-        '''
-        given a string val, tries to parse that string into the
+        """
+        given a string `val`, tries to parse that string into the
         most logical of datatypes.  
 
-            * if it's a string that contains true or false, then you 
-                will get the appropriate boolean
+            1. if it's a string that contains true or false, then you 
+               will get the appropriate boolean
 
-            * if it's a string that contains an integer, you'll get
-                an integer
+            2. if it's a string that contains an integer, you'll get
+               an integer
 
-            * if it's a string that contains a float, you'll get the
-                float
+            3. if it's a string that contains a float, you'll get the
+               float
 
-            * otherwise, you'll get the string with whitespace stripped off
+            4. otherwise, you'll get the string with whitespace stripped off
 
         returns the processed value, as described above
-        '''
+        """
 
         if val in ['True', 'true', True, 'TRUE']:
             return True
@@ -94,11 +150,11 @@ class FunctionParser:
             return val.strip()
 
     def parse_list(self, string):
-        '''
+        """
         wrapper around parse_string that takes in a 
         comma separated list of items and parses each
         in turn into a list.  optionally strips off [].
-        '''
+        """
 
         lst = string.strip('[]').split(',')
         for ii, val in enumerate(lst):
@@ -106,36 +162,43 @@ class FunctionParser:
         return lst
 
     def parse_array(self, string):
-        '''
+        """
         wrapper around parse_list that interprets the output
         as a numpy array.  
-        '''
+        """
         from numpy import array
         lst = self.parse_list(string)
         return array(lst)
 
     def parse_dict_general(self, string, limits=False, sep=';'):
-        '''
-        parses a string into a dictionary.  sep determines the 
-        separater between key-val pairs; keys and values can 
-        themselves be separated by =, :, or a space (will be 
-        checked in the order).  can also handles dictionaries 
-        that contain lists as items, though must be careful that 
-        there are no =, :, or spaces in thelist itself (depending 
-        on the adopted separator)
+        """
+        Parse a string into a dictionary.  
 
-        for example:
+        Turn a (potentially long) string into a dictionary, where 
+        the key,value pairs are separated by `sep`. Keys and values 
+        can themselves be separated by ``=``, ``:``, or a space 
+        (valid separators will be checked in the order).  This can 
+        also handle dictionaries that contain lists as items, though 
+        one must be careful that there are no =, :, or spaces in the 
+        list itself (depending on the adopted separator).  The 
+        separator between the key and value can change between each
+        key and value.
+
+        for example::
 
             string = 'key1:val1; key2=val2; key3 [val31, val32, val33]'
             self.parse_dict_general(string, sep=':')
-            >>> {'key1':'val1', 'key2':'val2', 'key3':['val31', 'val32', 'val33']}
+
+        returns::
+
+            {'key1':'val1', 'key2':'val2', 'key3':['val31', 'val32', 'val33']}
 
 
         this function has optional support for a "limit dictionary",
         where the keys are properties and the values are length two
         lists that bound an allowed region.  see parse_limlist for 
         guidance on those.
-        '''
+        """
         dictionary = {}
         items = string.strip('{}').split(sep)
         for it in items:
@@ -160,27 +223,42 @@ class FunctionParser:
             dictionary[key.strip()] = val
         return dictionary
 
-    def parse_dict(self, string):
-        '''
+    def _parse_dict(self, string):
+        """
         parse a string into a dictionary that is *not* a limit dictionary
-        '''
+        """
         return self.parse_dict_general(string, limits=False)
 
-    def parse_limdict(self, string):
-        '''
+    def _parse_limdict(self, string):
+        """
         parse a string into a dictionary is is a limit diciontary
-        '''
+        """
         return self.parse_dict_general(string, limits=True)
 
     def parse_limlist(self, lims):
-        '''
-        parse a string into min/max limits with the following rules:
-            * if a , is not included, float(lims) -- infinity is allowed
-            * if the string begins with either ","" or "[,", the -np.inf  -- float(lims) is allowed
-            * otherwise, splits on a comma and takes float of left and right
-                of that comma as the allowed region (defaulting to inf
-                for max allowed if there is one entry after splitting) 
-        '''
+        """
+        parse a string into a length-two list that corresponds to min/max limits
+
+        given a string that corresponds to some limiting range, apply the
+        following rules to determine the upper and lower bounds implied
+        by that string.  infinity is allowed in all cases.
+
+            1. if a ``,`` is not included, returns `float(lims)`
+            
+            2. if the string begins with either ``,`` or ``[,`` 
+               then returns `[-np.inf, float(lims)]`
+
+            3. otherwise, splits on a comma and takes float of 
+               left and right of that comma as the allowed region 
+               (defaulting to inf for max allowed if there is one 
+               entry after splitting)
+
+
+        Args:
+            lims: string
+                A string that will be parsed into one or two values 
+                representing some upper and lower bounds 
+        """
 
         if ',' not in lims:
             lims = [float(lims), np.inf]
@@ -193,7 +271,7 @@ class FunctionParser:
                 lims.append(np.inf)
         return lims
 
-    def mybool(self,val):
+    def _mybool(self,val):
         #handle boolean conversions w/o telling argparse that's what I'm doing
         return self.parse_string(val)
 
@@ -208,13 +286,13 @@ class FunctionParser:
 
         # how we handle each datatype
         tdict = {'float':float, float:float,
-            'bool':self.mybool, 'boolean':self.mybool, bool:self.mybool,
+            'bool':self._mybool, 'boolean':self._mybool, bool:self._mybool,
             'int':int, 'integer':int, int:int,
             'string':str, 'str':str, '':str, str:str, None:str, type(None):str,
             list: self.parse_list, 'list-like': self.parse_list, 'list': self.parse_list, 
             ndarray: self.parse_array, 'array-like': self.parse_array, 'array': self.parse_array, 
-            dict: self.parse_dict, 'dict': self.parse_dict, 'dictionary': self.parse_dict, 'dict-like': self.parse_dict,
-            'limit-dict': self.parse_limdict, 'limdict': self.parse_limdict, 'limitdict': self.parse_limdict}
+            dict: self._parse_dict, 'dict': self._parse_dict, 'dictionary': self._parse_dict, 'dict-like': self._parse_dict,
+            'limit-dict': self._parse_limdict, 'limdict': self._parse_limdict, 'limitdict': self._parse_limdict}
 
         if function is None:
             # self.parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -237,7 +315,12 @@ class FunctionParser:
             self.parhelp = {}
             self.partypes = {}
 
-            if 'param' in self.fullhelp:
+            if 'Args' in self.fullhelp:
+                self.docstring = self.fullhelp.split('Args')[0].strip('\n')
+            # want to preserve capitalization, so check for upper and lower
+            elif 'args' in self.fullhelp:
+                self.docstring = self.fullhelp.split('args')[0].strip('\n')
+            elif 'param' in self.fullhelp:
                 self.docstring = self.fullhelp.split('param')[0].strip(' \n')
             else:
                 self.docstring = self.fullhelp
@@ -252,9 +335,13 @@ class FunctionParser:
             self.typedict = {}
             for ii, arg in enumerate(self.args):
                 found = False
-                if ':param '+arg+':' in self.fullhelp:
-                    idx = self.fullhelp.index(':param '+arg+':')
-                    parhelp = self.fullhelp[idx+len(':param '+arg+':'):].split(':param')[0]
+                if (':param '+arg+':' in self.fullhelp) or (arg+':' in self.fullhelp):
+                    if (':param '+arg+':' in self.fullhelp):
+                        idx = self.fullhelp.index(':param '+arg+':')
+                        parhelp = self.fullhelp[idx+len(':param '+arg+':'):].split(':param')[0]
+                    else:
+                        idx = self.fullhelp.index(arg+':')
+                        parhelp = self.fullhelp[idx+len(arg+':'):].split('\n\n')[0]
                     
                     for t in types:
                         if ' '+t in parhelp or ':'+t in parhelp:
@@ -270,6 +357,9 @@ class FunctionParser:
                 parhelp = parhelp.strip().strip('\n')
                 if parhelp == ':':
                     parhelp = ''
+
+                # split off any return statements or additional info separated by a double line break
+                parhelp = parhelp.split('\n\n')[0]
                 self.typedict[arg] = partype
                 self.helpdict[arg] = parhelp
 
