@@ -365,7 +365,8 @@ class ProjectParticlesYT():
                                            that species uses the default)
 
             ** kwargs:  any valid keyword arguments to `self.clean_up_proj`
-                        or `yt.ProjectionPlot`
+                        or to either `self.yt4x_projection` or `self.yt3x_projection`,
+                        whichever is appropriate 
 
         Returns:
             either a single projection (if only one species) or a list of 
@@ -493,6 +494,8 @@ class ProjectParticlesYT():
                 return [1, 0, 2], [-1.0, 1.0, 1.0]
         raise KeyError("Passed in an invalid rotation or axis")
 
+
+YTProjection = ProjectParticlesYT()
 
     ## ARCHIVE:  before modularizing the code
     # def __init__(self, positions, masses,
