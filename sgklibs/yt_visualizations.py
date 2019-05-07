@@ -26,10 +26,11 @@ class ProjectParticlesYT():
         self.fontsize = 28
         self.dpi = 300
         self.proj = None
+        self.width_mult_buffer = 1.125
 
 
     def get_bbox(self, width):
-        bl = [-width/2, width/2]
+        bl = [-width*self.width_mult_buffer/2, width*self.width_mult_buffer/2]
         return np.array([bl, bl, bl])
 
 
@@ -44,8 +45,9 @@ class ProjectParticlesYT():
         return data
 
 
-    def save_proj(self, proj, outname):
-        proj.save(outname, mpl_kwargs=dict(dpi=self.dpi))
+    def save_proj(self, outname):
+        assert self.proj is not None, "cannot save the projection before it is created"
+        self.proj.save(outname, mpl_kwargs=dict(dpi=self.dpi))
 
     def yt3x_projection(self, cut_positions, cut_weights, width, 
         n_ref=8, axis=0, method='mip', pixels=2048, img_rotate=0, 
@@ -178,13 +180,14 @@ class ProjectParticlesYT():
         print("adding markers for {} points".format(data[('points', 'particle_position_x')].size))
         my_points = [data[('points', 'particle_position_'+ax)] for ax in ['x', 'y', 'z']]
 
-        prj = prj.annotate_marker(my_points, marker=',', coord_system='data', 
+        return self.proj.annotate_marker(my_points, marker=',', coord_system='data', 
             plot_args={'color': color, 's': (72./self.dpi)**2})  # trying to make the size be a single pixel...
 
 
     def circle_center(self, radius, circle_args={}):
         self.proj = self.proj.annotate_sphere(center=[0, 0, 0], 
             radius=radius, circle_args=circle_args)
+        return self.proj
 
 
     def set_bgcolor_and_units(self, method, unit=None):
@@ -202,6 +205,7 @@ class ProjectParticlesYT():
             self.proj.set_unit(self.field_name, 'Msun/pc**3')
         else:
             self.proj.set_unit(self.field_name, 'Msun/pc**2')
+        return self.proj
 
 
     def clean_up_proj(self, cmap=None, colorbar_label=None, 
@@ -248,12 +252,15 @@ class ProjectParticlesYT():
         ### handle the limits of the colorbar (if asked to)
         if (vmin is not None) and (vmax is not None):
             self.proj.set_zlim(self.field_name, vmin, vmax)
+
         elif vmin is not None and dynamic_range is not None:
             self.proj.set_zlim(self.field_name, zmin=vmin,
                                zmax=None, dynamic_range=dynamic_range)
+        
         elif vmax is not None and dynamic_range is not None:
             self.proj.set_zlim(self.field_name, zmin=None,
                                zmax=vmax, dynamic_range=dynamic_range)
+        
         elif dynamic_range is not None:
             zmax = self.proj.plots[self.field].image.get_clim()[1]
             zmin = zmax / dynamic_range
@@ -264,7 +271,7 @@ class ProjectParticlesYT():
         if hide_cbar:
             self.proj.hide_colorbar()
         elif colorbar_label is not None:
-            self.proj.set_colorbar_label(colorbar_label)
+            self.proj.set_colorbar_label(self.field_name, colorbar_label)
 
         ## remove the axes if requested, and add a scalebar instead
         if hide_axes:
@@ -285,9 +292,12 @@ class ProjectParticlesYT():
             else:
                 print("hiding all scalebars on a plot of width {}".format(self.proj.width[0].item()))
 
+        return self.proj
+
 
     def recenter_and_trim_part(self, part, center_position, spec, width, weight=None):
-        msk = boxmsk(part[spec]['position'], center_position, width/2)
+        ## allow a small buffer around the edge to avoid edge effects
+        msk = boxmsk(part[spec]['position'], center_position, width*self.width_mult_buffer/2)
         cut_positions = part[spec]['position'][msk] - center_position
 
         if weight is not None:
@@ -298,44 +308,89 @@ class ProjectParticlesYT():
         return cut_positions, cut_weights
 
 
-    def add_label(self, text, text_loc, color='white', ha='left', va='top', inset_box_args=None, 
-        fontsize=None, **kwargs):
+    def add_label(self, text, text_loc=(0.025, 0.975), coord_system='axis', 
+        fontsize=None, text_args=dict(color='white', ha='left', va='top'),
+        inset_box_args=dict(facecolor='None', edgecolor='None'), **kwargs):
+        """
+        add text to the projection, defaulting to the top left
+        """
+        assert self.proj is not None, "cannot add text before making a projection"
 
         if fontsize is None:
-            fontsize = self.fontsize
-        text_args = dict(fontsize=fontsize)
-        self.proj.annotate_text(text_loc, text, color=color, ha=ha, va=va,
-            inset_box_args=inset_box_args, text_args=text_args)
+            text_args['fontsize'] = self.fontsize
+        else:
+            text_args['fontsize'] = fontsize
+
+        self.proj.annotate_text(text_loc, text, coord_system=coord_system, 
+            text_args=text_args, inset_box_args=inset_box_args, **kwargs)
+
+        return self.proj
 
 
     def project_gizmo_snap(self, width, species=['star'], weight='mass', 
-        center_position=None, host_index=0, outname_base=None, 
-        read_kwargs={}, **kwargs):
+        center_position=None, host_index=0, outname_base=None, read_kwargs={}, 
+        cmaps=None, **kwargs):
         """
         visualize a gizmo snapshot using yt.ProjectionPlot.  
 
         Args:
+            * width (float):  width of the image to visualize
+
+            * species (str or list):  species to visualize
+
+            * center_position (None or len 3):  either None to find the 
+                                                center automatically, or 
+                                                a length-3 array giving the
+                                                center position
+
+            * host_index (int): index of the host (starting at zero) to 
+                                center on if center_position is None
+
+            * outname_base (None or str):  beginning of the path to save 
+                                           the projections to.  adds the
+                                           species to the end of each name.
+                                           if None, then the projections aren't 
+                                           saved
 
             * read_kwargs:  a dictionary of keyword arguments to pass to 
                             `gizmo_analysis.gizmo_io.Read.read_snapshots`,
                             e.g. simulation_directory or snapshot_directory
 
+            * cmaps (str, None, or list):  if None, then uses the default 
+                                           colormap for all species.  if a 
+                                           list, then needs to be the same 
+                                           length as `species`, and each 
+                                           entry should be either a valid 
+                                           colormap or None (in which case
+                                           that species uses the default)
+
             ** kwargs:  any valid keyword arguments to `self.clean_up_proj`
                         or `yt.ProjectionPlot`
-        """
 
+        Returns:
+            either a single projection (if only one species) or a list of 
+            projections (one for each species)
+        """
         from gizmo_analysis import gizmo_io
+
+        if np.isscalar(species):
+            species = [species]
+
+        if cmaps is None:
+            cmaps = [None] * len(species)
+
+        if np.isscalar(cmaps):
+            cmaps = [cmaps]
+        assert len(cmaps) == len(species), "must provide a colormap for each species, or none at all"
 
         assign_host_coordinates = False
         host_number = 1
-
         if center_position is None:
             assign_host_coordinates = True
             host_number = host_index + 1
         
-        part = gizmo_io.Read.read_snapshots(species=species, 
-            properties=['position', weight], assign_host_coordinates=assign_host_coordinates, 
-            host_number=host_number, **read_kwargs)
+        part = gizmo_io.Read.read_snapshots(species=species, properties=['position', weight], 
+            assign_host_coordinates=assign_host_coordinates, host_number=host_number, **read_kwargs)
 
         if center_position is None:
             center_position = part.host_positions[host_index]
@@ -344,7 +399,7 @@ class ProjectParticlesYT():
         clean_up_kwargs = dict([(k, kwargs.pop(k)) for k in valid_cleanup_kwargs if k in kwargs])
 
         projections = []
-        for spec in species:
+        for ii, spec in enumerate(species):
             ## get the valid particle positions for this species and recenter
             cut_positions, cut_weights = self.recenter_and_trim_part(part, 
                 center_position, spec, width, weight=weight)
@@ -357,12 +412,12 @@ class ProjectParticlesYT():
                 self.yt3x_projection(cut_positions, cut_weights, width, **kwargs)
 
             ## clean up the axes as requested
-            self.clean_up_proj(**clean_up_kwargs)
+            self.clean_up_proj(cmap=cmaps[ii], **clean_up_kwargs)
 
             ## save this projection and move on
             projections.append(self.proj)
             if outname_base is not None:
-                self.save(outname_base+'_'+spec+'.png')
+                self.save_proj(outname_base+'_'+spec+'.png')
 
         if len(projections) == 1:
             return projections[0]
@@ -370,8 +425,7 @@ class ProjectParticlesYT():
             return projections
 
 
-    def add_halos(self, prj, hal,
-                  center=np.array([0, 0, 0]),
+    def add_halos(self, hal, center=np.array([0, 0, 0]),
                   position_prop='position',
                   hal_indices=None, hal_cuts={},
                   radiusprop='radius',
@@ -383,11 +437,10 @@ class ProjectParticlesYT():
         given a dictionary of halos hal (read in via the rockstar_analysis
         package), adds them to an existing projection prj as circles 
         '''
+        import rockstar_analysis
 
         hal_positions = hal.prop(position_prop) - center
         indices, inversions = self.parse_img_rotate(img_rotate, axis)
-
-        import rockstar_analysis
 
         if hal_indices is None:
             if 'manual.mask' in hal:
@@ -401,9 +454,9 @@ class ProjectParticlesYT():
         for idx in hal_indices:
             c = np.array([hal_positions[idx][indices[ii]] *
                           inversions[ii] for ii in range(3)])
-            prj.annotate_sphere(c, radius=(
+            self.proj.annotate_sphere(c, radius=(
                 hal[radiusprop][idx], 'kpc'), circle_args=circle_args)
-        return prj
+        return self.proj
 
     def parse_img_rotate(self, rotation, axis):
         assert axis in [0, 1, 2, 'x', 'y', 'z']
