@@ -51,7 +51,8 @@ class ProjectParticlesYT():
 
     def yt3x_projection(self, cut_positions, cut_weights, width, 
         n_ref=8, axis=0, method='mip', pixels=2048, img_rotate=0, 
-        length_unit='kpc', mass_unit='Msun', **kwargs):
+        length_unit='kpc', mass_unit='Msun', interpolation='bicubic', 
+        **kwargs):
         """
         use the yt-3 method of creating a ProjectionPlot out of 
         particle data defined cut_positions and cut_weights, 
@@ -83,6 +84,8 @@ class ProjectParticlesYT():
 
             * mass_unit (str):  unit of the cut_weights
 
+            * interpolation (str):  type of interpolation to apply to the image
+
             ** kwargs:  passed to yt.ProjectionPlot
 
 
@@ -101,6 +104,11 @@ class ProjectParticlesYT():
 
         self.proj = yt.ProjectionPlot(ds, axis, self.field, method=method, 
             center=np.zeros(3), width=(width, length_unit), **kwargs)
+
+        plot = self.proj.plots[list(self.proj.plots)[0]]
+        ax = plot.axes
+        img = ax.images[0]
+        img.set_interpolation(interpolation)
 
         self.proj.set_buff_size((pixels, pixels))
         self.proj.set_figure_size(self.figure_size)
