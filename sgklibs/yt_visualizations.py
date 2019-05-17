@@ -22,7 +22,7 @@ class ProjectParticlesYT():
     
     Attributes:
         proj (:ob:`yt.visualization.plot_window.ProjectionPlot`):  A 
-            yt projection plot, though this only exists once either 
+            yt projection plot, though this will be None until either 
             `yt3x_projection` or `yt4x_projection` is called.  
         dpi (int):  The dots-per-inch used in saving the figure.  
             will be set automatically to the required number to have each
@@ -36,7 +36,22 @@ class ProjectParticlesYT():
             yt.  should be > 1 -- setting = 1 can give edge effects
         yt4 (bool):  Whether or not the imported version of yt parses
             to be >= 4.
-            
+
+    The following attributes will be set in the course of making 
+    the projection, and so should be accessible once the appropriate
+    function is called (useful so that follow-up annotations don't 
+    have to specify the axis, method, and image rotation again):
+        method (str):  the method used to create the projection
+        indices (list):  length 3 list that, together with inversions,
+            yields the proper x-y-z to visualization-x-y-z mapping for 
+            the requested image rotation and projection axis.  this
+            list contains [0, 1, 2] and indices the columns of 
+            the position array.
+        inversions (list):  length 3 list of either 1.0 or -1.0 to 
+            flip axes as needed to get the proper axis/rotation 
+            combination
+        field (tuple):  tuple giving the field that we visualized
+        field_name (str):  just the name of the field we visualized
     """
 
     def __init__(self):
@@ -46,9 +61,10 @@ class ProjectParticlesYT():
         else:
             self.yt4 = False
 
-        self.figure_size = 10
-        self.fontsize = 28
-        self.dpi = 300
+        ## set some defaults for the class
+        self.figure_size = 10   # in inches
+        self.fontsize = 28  # in points
+        self.dpi = 300  # in dots per inch
         self.proj = None
         self.width_mult_buffer = 1.125
 
@@ -64,11 +80,15 @@ class ProjectParticlesYT():
             bbox:  a 3x2 array that bounds the total width of 
                 the cube plus a given by self.width_mult_buffer.
         """
+
+        ## should be an 3x2 array giving min-max in each dimension
+        ## but all dimensions are the same because we're doing a cube
+        ## and we're centering on 0, 0, 0 
         bl = [-width*self.width_mult_buffer/2, width*self.width_mult_buffer/2]
         return np.array([bl, bl, bl])
 
 
-    def prepare_data_dictionary(self, cut_positions, cut_weights, ptype, axis, img_rotate):
+    def prepare_data_dictionary(self, cut_positions, cut_weights, ptype, axis=None, img_rotate=None):
         """
         create a dictionary to pass to yt from arrays of particle data
         
@@ -87,7 +107,7 @@ class ProjectParticlesYT():
             ptype (str):  name of the particle species, for purposes of
                 getting the colorbar correct.
            
-            axis (int or str):  either 'x', 'y', 'z', 1, 2, or 3 to give 
+            axis (int or str):  either 'x', 'y', 'z', 0, 1, or 2 to give 
                 the axis you want to project the particles down (i.e., 
                 'x' will give the density in the y-z plane).
             img_rotate (int):  either 0, 90, 180, or 270 to rotate the 
@@ -100,8 +120,21 @@ class ProjectParticlesYT():
                 the projection along and rotation about the axis will be 
                 correct.
         """
-        indices, inversions = self.parse_img_rotate(img_rotate, axis)
 
+        ## if we're run this function before, just the previously parsed 
+        ## indices and inversions to save from having to pass them in to 
+        ## additional functions
+        if axis is None or img_rotate is None:
+            if not hasattr(self, 'indices'):
+                raise AssertionError("cannot prepare the intial data dictionary without specifying both axis and img_rotate")
+
+            indices = self.indices
+            inversions = self.inversions
+        else:
+            indices, inversions = self.parse_img_rotate(img_rotate, axis)
+
+
+        ## yt expects a dictionary of arrays with keys as given in the docstring
         data = {}
         data[(ptype, 'particle_mass')] = cut_weights
         for ii, ax in enumerate(['x', 'y', 'z']):
@@ -164,30 +197,47 @@ class ProjectParticlesYT():
             a yt.ProjectionPlot instance
         """
 
+        ## set the method as a class variable for future function to use
+        self.method = method
+
+        ## put the data in the structure we want
+        ## note that we'll use 'io' here as the species name, but 
+        ## it's really irrelevant in yt3 -- we can use whatever we want
+        ## as long as we're consistent below
         data = self.prepare_data_dictionary(cut_positions, cut_weights, 'io', axis, img_rotate)
+
+        ## build the bounding box
         bbox = self.get_bbox(width)
 
+        ## load the particles into yt.  no periodicity because we've artificially trimmed the particles
         ds = yt.load_particles(data, length_unit=length_unit, mass_unit=mass_unit, bbox=bbox, 
             n_ref=n_ref, periodicity=(False, False, False))
+
 
         self.field = ('deposit', 'io_density')
         self.field_name = self.field[1]
 
-        self.proj = yt.ProjectionPlot(ds, axis, self.field, method=method, 
+        ## make the actual projection
+        self.proj = yt.ProjectionPlot(ds, axis, self.field, method=self.method, 
             center=np.zeros(3), width=(width, length_unit), **kwargs)
 
+        ## set the interpolation between pixels in the image
         plot = self.proj.plots[list(self.proj.plots)[0]]
         ax = plot.axes
         img = ax.images[0]
         img.set_interpolation(interpolation)
 
+        ## set the buffer size -- have to do this in post in yt3 main branch
         self.proj.set_buff_size((pixels, pixels))
+
+        ## set the figure size too
         self.proj.set_figure_size(self.figure_size)
 
         ## store the appropriate DPI for later saving
         self.dpi = pixels / self.figure_size 
 
-        self.set_bgcolor_and_units(method)
+        ## fig the color of the background and set units of the colorbar
+        self.set_bgcolor_and_units()
 
         return self.proj
 
@@ -229,31 +279,47 @@ class ProjectParticlesYT():
         Returns:
             a yt.ProjectionPlot instance
         """
-        import yt
+        self.method = method
 
+        ## prepare a dictionary with our data
+        ## here the data does HAVE to be in 'io', as that's where 
+        ## the sph field adder looks
         data = self.prepare_data_dictionary(cut_positions, cut_weights, 'io', axis, img_rotate)
+        
+        ## get the bounding box for our particles
         bbox = self.get_bbox(width)
 
+        ## load the particles into yt.  no n_ref this time because we're not 
+        ## putting the particles onto a grid (so no refining)
         ds = yt.load_particles(data, length_unit=length_unit, mass_unit=mass_unit, bbox=bbox,
             periodicity=(False, False, False))
 
+        ## since we're not putting on a grid, we have to calculate 
+        ## densities in an sph-like way.  this method adds the 
+        ## smoothing length and density fields
         ds.add_sph_fields()
 
         self.field = ('io', 'density')
         self.field_name = self.field[1]
 
+        ## now make the projection.  
         self.proj = yt.ProjectionPlot(ds, axis, self.field, center=np.zeros(3), 
-            width=(width, length_unit), buff_size=(pixels, pixels), method=method)
+            width=(width, length_unit), buff_size=(pixels, pixels), method=self.method)
 
-        self.set_bgcolor_and_units(method)
+        ## again, fix up the background color etc.
+        self.set_bgcolor_and_units()
 
+        ## and set our figure size again.  no need to set our 
+        ## buff size afterwards because we can set it in the 
+        ## constructor now
         self.proj.set_figure_size(self.figure_size)
+        
         self.dpi = pixels / self.figure_size
 
         return self.proj
 
 
-    def add_particle_points(self, cut_points_to_plot, img_rotate, axis, color):
+    def add_particle_points(self, cut_points_to_plot, color):
         """
         add individual dots to the image, e.g. to represent another particle species
         
@@ -262,17 +328,22 @@ class ProjectParticlesYT():
                 (in the same frame as the original data, but again shifted such 
                 that the visualization center is at (0, 0, 0)) to add dots to the 
                 image
-            img_rotate (int):  either 0, 90, 180, or 270 to rotate the 
-                image (in the plane of the image) by that many degrees
-            axis (int or str):  axis to project along
             color (str):  valid matplotlib color to apply to the points                        
         """
+        assert self.proj is not None, "cannot add particle points until the projection is created"
         
-        data = self.prepare_data_dictionary(cut_points_to_plot, np.zeros(cut_points_to_plot.shape[0]), 'points', axis, img_rotate)
+        ## no weights to bother with here since we're just splatting points
+        ## this is still the easiest way to handle the fact that we've 
+        ## remapped/flipped the axes and though:
+        data = self.prepare_data_dictionary(
+            cut_points_to_plot, np.zeros(cut_points_to_plot.shape[0]), 'points')
 
         print("adding markers for {} points".format(data[('points', 'particle_position_x')].size))
-        my_points = [data[('points', 'particle_position_'+ax)] for ax in ['x', 'y', 'z']]
 
+        ## for whatever reason, proj.annotate_marker requires a list of points, not an array, so pull them back out
+        my_points = [data[('points', 'particle_position_'+ax)] for ax in 'xyz']
+
+        ## and splat the points down
         return self.proj.annotate_marker(my_points, marker=',', coord_system='data', 
             plot_args={'color': color, 's': (72./self.dpi)**2})  # trying to make the size be a single pixel...
 
@@ -287,29 +358,32 @@ class ProjectParticlesYT():
             circle_args (dict):  dictionary of arguments passed
                 to the matplotlib circle object to style it.
         """
-        
+        assert self.proj is not None, "cannot add a circle until the projection is created"
+
         self.proj = self.proj.annotate_sphere(center=[0, 0, 0], 
             radius=radius, circle_args=circle_args)
         return self.proj
 
 
-    def set_bgcolor_and_units(self, method, unit=None):
+    def set_bgcolor_and_units(self, unit=None):
         """
         set the background color and units of the colorbar
 
         should be run on every plot
         
         Args:
-            method (str):  the method used to create the plot, for knowing
-                whether we're doing a 2D or 3D value.
             unit (str):  unit to use, if setting by hand.
         """
         assert self.proj is not None, "must be run after the projection is created"
+        
+        ## set the color of the background to be the min on the colorbar
         self.proj.set_background_color(self.field_name)
 
+        ## set the units to be something meaningful if not 
+        ## specified by hand
         if unit is not None:
             self.proj.set_unit(self.field_name, unit)
-        elif method == 'mip':
+        elif self.method == 'mip':
             self.proj.set_unit(self.field_name, 'Msun/pc**3')
         else:
             self.proj.set_unit(self.field_name, 'Msun/pc**2')
@@ -423,8 +497,14 @@ class ProjectParticlesYT():
                 array for the particles in the box, or None if weight is None.    
         """
         
+        ## which particles fall within a cube of half-side length (width*buffer)/2 of the center?
+        ## allow a small buffer around the edge to avoid edge effects
         msk = boxmsk(pos, center_position, width*self.width_mult_buffer/2)
+
+        ## now select only those particles and shift so the center is at 0, 0, 0
         cut_positions = pos[msk] - center_position
+
+        ## cut the weights too if they were passed in
         if weight is not None:
             cut_weights = weight[msk]
         else:
@@ -458,12 +538,13 @@ class ProjectParticlesYT():
                 field for the particles in the box, or None if weight is None.
         """
         
-        ## allow a small buffer around the edge to avoid edge effects
+        ## pull the properties out of the particle dictionary
         pos = part[spec]['position']
         if weight is not None:
             weight = part[spec][weight]
             
-        return recenter_and_trim_arrays(pos, center_position, width, weight)
+        ## and pass to the true workhorse:
+        return self.recenter_and_trim_arrays(pos, center_position, width, weight)
 
 
     def add_label(self, text, text_loc=(0.025, 0.975), coord_system='axis', 
@@ -497,7 +578,7 @@ class ProjectParticlesYT():
         return self.proj
 
 
-    def project_gizmo_snap(self, width, species=['star'], weight='mass', 
+    def project_gizmo_snap(self, width, species='star', weight='mass', 
         center_position=None, host_index=0, outname_base=None, read_kwargs={}, 
         cmaps=None, **kwargs):
         """
@@ -536,17 +617,19 @@ class ProjectParticlesYT():
 
             ** kwargs:  any valid keyword arguments to `self.clean_up_proj`
                         or to either `self.yt4x_projection` or `self.yt3x_projection`,
-                        whichever is appropriate 
+                        whichever is appropriate for your system
 
         Returns:
-            either a single projection (if only one species) or a list of 
+            either a single projection (if only one species) or a dictionary of 
             projections (one for each species)
         """
         from gizmo_analysis import gizmo_io
 
+        ## ok to pass in just one species, but we're still going to treat as a list
         if np.isscalar(species):
             species = [species]
 
+        ## expand our colormaps to be the same length as our species
         if cmaps is None:
             cmaps = [None] * len(species)
 
@@ -554,44 +637,57 @@ class ProjectParticlesYT():
             cmaps = [cmaps]
         assert len(cmaps) == len(species), "must provide a colormap for each species, or none at all"
 
+
+        ## decide whether or not we're going to assign a host center
+        ## depends on whether or not we passed in a center by hand
         assign_host_coordinates = False
         host_number = 1
         if center_position is None:
             assign_host_coordinates = True
             host_number = host_index + 1
+
+            if 'star' not in species and 'dark' not in species:
+                raise ValueError("cannot assign center based on gas, so must visualize either" + 
+                    "star or dark as well, or pass in the center by hand")
         
+        ## read the particle data and optionally assign a center to 1 or more objects
         part = gizmo_io.Read.read_snapshots(species=species, properties=['position', weight], 
             assign_host_coordinates=assign_host_coordinates, host_number=host_number, **read_kwargs)
 
+        ## grab that center position
         if center_position is None:
             center_position = part.host_positions[host_index]
 
+        ## keyword args related to the look of the figure (i.e. in self.clean_up_proj)
+        ## get separated out
         valid_cleanup_kwargs = self.clean_up_proj.__code__.co_varnames
         clean_up_kwargs = dict([(k, kwargs.pop(k)) for k in valid_cleanup_kwargs if k in kwargs])
 
-        projections = []
+        ## make a projection for each requested particle species
+        projections = {}
         for ii, spec in enumerate(species):
             ## get the valid particle positions for this species and recenter
             cut_positions, cut_weights = self.recenter_and_trim_part(part, 
                 center_position, spec, width, weight=weight)
 
             print("projecting {:,} {} particles, weighted by {}".format(cut_positions.shape[0], spec, weight))
-            
+
+            ## call the appropriate routine for the version of yt installed on this system            
             if self.yt4:
                 self.yt4x_projection(cut_positions, cut_weights, width, **kwargs)
             else:
                 self.yt3x_projection(cut_positions, cut_weights, width, **kwargs)
 
-            ## clean up the axes as requested
+            ## clean up the axes using the requested colormap
             self.clean_up_proj(cmap=cmaps[ii], **clean_up_kwargs)
 
             ## save this projection and move on
-            projections.append(self.proj)
+            projections[spec] = self.proj
             if outname_base is not None:
                 self.save_proj(outname_base+'_'+spec+'.png')
 
-        if len(projections) == 1:
-            return projections[0]
+        if len(species) == 1:
+            return projections[species[0]]
         else:
             return projections
 
@@ -601,9 +697,7 @@ class ProjectParticlesYT():
                   hal_indices=None, hal_cuts={},
                   radiusprop='radius',
                   circle_args={'facecolor': None,
-                               'edgecolor': 'white', 'linewidth': 1.5},
-                  img_rotate=0, axis=0,
-                  ):
+                               'edgecolor': 'white', 'linewidth': 1.5}):
         '''
         adds circles around halos in a halo catalog to a projection plot
 
@@ -617,19 +711,21 @@ class ProjectParticlesYT():
             hal_indices (array):  list of indices in `hal` of halos to circle
             hal_cuts (dict):  dictionary of 'key':[lower_limit, upper_limit] items that
                 constrain the halos that are circled (e.g. hal_cuts={'vel.circ.max':[5, 150]}
-                would only circle halos with 5 <= Vmax < 150).
+                would only circle halos with 5 <= Vmax < 150).  overridden by hal_indices
+                though.
             radiusprop (str):  property to query to get the radius of the circles to draw
             circle_args (dict):  dictionary of keyword arguments to pass to the matplotlib
                 circle artist to style the circles.
-            img_rotate (int):  angle that we've rotated the image in the plane 
-                (0, 90, 180, and 270 only)
-            axis (int or str):  axis that we've projected down
         '''
+        assert self.proj is not None, "cannot add halos to a projection until it is created"
+
         import rockstar_analysis
 
+        ## get the positions relative to the center of the visualization
         hal_positions = hal.prop(position_prop) - center_position
-        indices, inversions = self.parse_img_rotate(img_rotate, axis)
 
+        ### select halos either using the passed in halo indices or 
+        ## based on the value of some property/properties
         if hal_indices is None:
             if 'manual.mask' in hal:
                 hal_cuts['manual.mask'] = [0.5, 1.5]  # add this one by hand
@@ -640,8 +736,9 @@ class ProjectParticlesYT():
 
         print("Adding circles for {} halos in the catalog".format(hal_indices.size))
         for idx in hal_indices:
-            c = np.array([hal_positions[idx][indices[ii]] *
-                          inversions[ii] for ii in range(3)])
+            ## have to do this one-by-one cause annotate_sphere won't accept many spheres
+            c = np.array([hal_positions[idx][self.indices[ii]] *
+                          self.inversions[ii] for ii in range(3)])
             self.proj.annotate_sphere(c, radius=(
                 hal[radiusprop][idx], 'kpc'), circle_args=circle_args)
         return self.proj
